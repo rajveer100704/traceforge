@@ -38,7 +38,9 @@ class TaskFamily(Protocol):
     templates: tuple[str, ...]
     allowed_imports: tuple[str, ...]
 
-    def render(self, template_id: str, seed: int) -> RenderedTask: ...
+    def render(
+        self, template_id: str, seed: int, oracle_version: str = "1.1.0"
+    ) -> RenderedTask: ...
 
 
 def rng_for(family_id: str, template_id: str, seed: int) -> random.Random:

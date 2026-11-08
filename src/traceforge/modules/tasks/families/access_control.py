@@ -361,7 +361,8 @@ class AccessControlFamily:
     templates: tuple[str, ...] = ("t0", "t1", "t2")
     allowed_imports: tuple[str, ...] = ("dataclasses", "typing", "collections", "enum")
 
-    def render(self, template_id: str, seed: int) -> RenderedTask:
+    def render(self, template_id: str, seed: int, oracle_version: str = "1.1.0") -> RenderedTask:
+        # hidden tests for this family are identical in oracle versions 1.0.0 and 1.1.0
         rng = rng_for(self.family_id, template_id, seed)
         owner, other, attacker, admin, stranger = rng.sample(USERS, 5)
         id1, id2 = rng.sample(range(10, 500), 2)

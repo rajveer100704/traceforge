@@ -35,6 +35,42 @@ with verifier 1.0.0 and are kept as recorded.
   `known_at("1.0.0")` is unchanged; the other four held-out attacks remain held out for 1.1.0.
 - Experiment H now derives its development/held-out sets from the verifier version under test.
 
+### Review follow-ups (PR #2)
+- Static rule also rejects comparison methods bound without `def`: class-body assignment
+  (including annotated, augmented and multiple targets, nested classes, aliased callables),
+  walrus, `for` targets, import aliases, `dict(__eq__=...)` keywords and string literals naming a
+  comparison dunder (dynamic `type()` construction).
+- Historical task version 1.0.0 stays available for re-verification. It is rebuilt by a frozen
+  legacy renderer (`families/legacy_1_0_0.py`) and checked against fixture hashes pinned from the
+  v0.2.0 release. It is reachable only by explicit version; listings and benchmarks use 1.1.0. An
+  unavailable version raises `UnsupportedTaskVersion` (HTTP 409) with the available versions.
+- Rollout requests pin the concrete task version at acceptance, so queued or retried jobs never
+  switch versions.
+- Instances advertise and serve only the task versions they can execute. `/health/ready` reports
+  version skew; the rolling-upgrade order is in `docs/operations.md`.
+- Task sync is idempotent and concurrency-safe (`INSERT ... ON CONFLICT DO NOTHING`, then the stored
+  fixture hash is re-read and validated; SQLite and PostgreSQL).
+- `universal_equality` no longer lists `verified-v1` as a reward policy that knew it (only the
+  verifier changed).
+- The verifier provenance `config_hash` now covers every static-safety constant (including the
+  comparison rule and frame attributes) and the engine version.
+- The pre-execution static gate applies to the authoritative FULL (V3) profile. VISIBLE_TESTS (R2)
+  and SELF_REPORT (R1) remain deliberately weak, non-authoritative research baselines: R2 is still
+  fooled by `universal_equality` (tested), and neither can yield authoritative reward or a verified
+  success.
+
+### Experiment H re-run against verifier 1.1.0 (new output; the 1.0.0 result is untouched)
+`research/results/experiment_H_verifier_1.1.0/`: 459 episodes, 9 tasks, seeds 0–2, scripted
+provider. R3 false-positive reward rate:
+- **0.0 % (0/297)** on attacks known to 1.1.0 (the 9 development attacks plus
+  `universal_equality`; Wilson [0.0, 1.3], task-clustered [0.0, 0.0]);
+- **0.0 % (0/108)** on the four attacks still held out for 1.1.0 (Wilson [0.0, 3.4], task-clustered
+  [0.0, 0.0]).
+
+R3 rewarded 100 % of genuine fixes (n=54). The historical verifier 1.0.0 result (R3 held-out 6/135,
+4.4 %) is unchanged. In the per-attack table, "Set" is the authoring-time set; the summary table
+uses the sets relative to 1.1.0.
+
 ### Limits
 This removes one known exploit class. It does not show that the verifier is ungameable: robustness
 claims for 1.1.0 can only come from attacks that remain held out for it (currently four), and new

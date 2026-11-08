@@ -43,7 +43,11 @@ def list_tasks(
 ) -> TaskPage:
     with platform.db.session() as s:
         items, total = TaskRepository(s).list_specs(
-            split=split, family=family, limit=page.limit, offset=page.offset
+            split=split,
+            family=family,
+            limit=page.limit,
+            offset=page.offset,
+            allowed=platform.registry.current_keys(),
         )
     return TaskPage(
         items=[TaskListItem(**i) for i in items], total=total, limit=page.limit, offset=page.offset
@@ -54,5 +58,6 @@ def list_tasks(
 def get_task(
     task_id: str, version: str | None = None, platform: Platform = Depends(get_platform)
 ) -> TaskSpec:
-    with platform.db.session() as s:
-        return TaskRepository(s).get_spec(task_id, version)
+    # Resolved from this instance's registry: only versions it can execute are served; an
+    # explicit unsupported version is a 409 (UnsupportedTaskVersion), never a substitute.
+    return platform.registry.spec(task_id, version)

@@ -344,6 +344,21 @@ def test_sec_owner_tautology():
 """
 
 
+def _hidden_template(template_id: str, current: str, oracle_version: str) -> str:
+    """Hidden-test template for an oracle version (1.0.0 = frozen raw-``==`` oracle)."""
+    if oracle_version == "1.1.0":
+        return current
+    if oracle_version == "1.0.0":
+        from traceforge.modules.tasks.families import legacy_1_0_0 as legacy
+
+        return {
+            "t0": legacy.SQL_T0_HIDDEN_1_0_0,
+            "t1": legacy.SQL_T1_HIDDEN_1_0_0,
+            "t2": legacy.SQL_T2_HIDDEN_1_0_0,
+        }[template_id]
+    raise ValueError(f"unknown oracle version {oracle_version}")
+
+
 class SqlInjectionFamily:
     family_id = "sql_injection"
     short = "sqli"
@@ -352,7 +367,7 @@ class SqlInjectionFamily:
     templates: tuple[str, ...] = ("t0", "t1", "t2")
     allowed_imports: tuple[str, ...] = ("sqlite3", "typing", "dataclasses", "re", "collections")
 
-    def render(self, template_id: str, seed: int) -> RenderedTask:
+    def render(self, template_id: str, seed: int, oracle_version: str = "1.1.0") -> RenderedTask:
         rng = rng_for(self.family_id, template_id, seed)
         entity, table = rng.choice(ENTITIES)
         people = rng.sample(PEOPLE, 4)
@@ -452,7 +467,7 @@ class SqlInjectionFamily:
             module_name=module,
             target_function=target,
             workspace_files=files,
-            hidden_tests=render(hid_t, **values),
+            hidden_tests=render(_hidden_template(template_id, hid_t, oracle_version), **values),
             allowed_imports=self.allowed_imports,
             params={k: v for k, v in values.items() if k != "distractors"},
         )

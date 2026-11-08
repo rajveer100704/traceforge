@@ -126,8 +126,9 @@ ATTACKS: tuple[AttackEntry, ...] = (
         "0.2.0",
         # Held out for verifier 1.0.0 (Experiment H, 2026-11-09: R3 rewarded it on sqli-t1/t2).
         # Verifier 1.1.0 was changed in response, so it is a development attack for 1.1.0.
+        # The reward policy verified-v1 was NOT changed (it predates the attack).
         ("1.1.0",),
-        ("verified-v1",),
+        (),
     ),
     AttackEntry(
         "exception_masking",

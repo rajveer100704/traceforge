@@ -24,13 +24,36 @@ Verified 2026-11-09 · Windows 11 · Python 3.12 · no GPU · Docker Desktop 28.
 | `uv run traceforge demo` | demo PASSED |
 | Docker sandbox test (`-m docker`), 10 consecutive runs | 10/10 passed (8–33 s each); also passed inside the full suite |
 
+### PR #2 review follow-ups (all eight Sourcery findings)
+
+| Finding | Fix | Evidence (`tests/integration/test_review_findings_pr2.py` unless noted) |
+|---|---|---|
+| 1 comparison-dunder assignment bypass | Store-context names, import aliases, keywords and string literals rejected | assignment/multi/ann/aug/nested/aliased forms rejected; blocked before any execution (`_NoExec`) |
+| 2 historical re-verification | frozen 1.0.0 legacy renderer + pinned fixture hashes; historical versions explicit-only | all 39 1.0.0 bundles match pinned hashes; old rollout re-verified as `1.0.0+engine1.1.0`; missing version → actionable 409 |
+| 3 pin version at acceptance | `RolloutRequest.task_version` resolved before job creation | implicit → 1.1.0, explicit 1.0.0 kept, idempotent replay unchanged, retried job keeps 1.0.0 after upgrade |
+| 4 mixed-version instances | listing and lookup restricted to executable versions; readiness reports skew; rolling-upgrade order documented | old + new registries on one DB: old lists 1.0.0 only, 409 for 1.1.0, old worker refuses 1.1.0 job |
+| 5 concurrent sync | `ON CONFLICT DO NOTHING` + re-read and validate fixture hash | 8-thread race on SQLite: one row, same id; conflicting hash → ConflictError; PostgreSQL variant runs in CI |
+| 6 R2 visible-only profile | not gated (intentional, non-authoritative baseline); claims scoped to FULL | R2 still fooled; verified-v1 reward 0 and outcome UNKNOWN for V2; FULL rejects pre-execution |
+| 7 attack reward-policy provenance | `universal_equality.reward_policies_known = ()` | catalogue test (verified-v1 unchanged at 1.0.0) |
+| 8 verifier provenance hash | all static-safety constants + engine version hashed | hash deterministic, changes when the rule changes, recorded in bundles |
+
+Experiment H against verifier 1.1.0 (`research/results/experiment_H_verifier_1.1.0/`, new; the 1.0.0
+output is unchanged): R3 FP 0/297 on attacks known to 1.1.0 and **0/108 on the four still held out**
+(Wilson [0.0 %, 3.4 %], task-clustered [0, 0]); TP 54/54. Scripted provider only; no robustness
+claim beyond these attacks and tasks.
+
+Validation after the follow-ups: `pytest --cov` **269 passed, 4 skipped** (no CUDA; Postgres URL
+unset ×2; Windows symlinks), 87 % coverage; ruff, format, mypy (116 files), bandit clean; pip-audit
+clean; db check no drift; demo PASSED; Docker sandbox test 5/5 standalone + in the full suite. One
+test change: `test_api.py` allows its cpu-test training job 180 s instead of 30 s (it took 148 s on
+this loaded host and failed at 137fccc as well); assertions unchanged.
+
 Docker flakiness: the single failure seen during v0.2 (first run right after an image rebuild, 106 s,
 output not captured) has not recurred in 12 later runs. Likely cause: a container wait exceeding the
 20 s isolated-verifier budget under heavy host load. Not confirmed.
 
 Not executed: real-CUDA tests (no GPU); PostgreSQL migration test locally (CI `postgres` job covers it);
-Experiment H has not been re-run against verifier 1.1.0. Any 1.1.0 robustness claim needs that rerun,
-on the four attacks that remain held out for it.
+Experiment H was re-run against 1.1.0 (see above).
 
 ---
 

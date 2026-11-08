@@ -34,7 +34,10 @@ def ready(response: Response, platform: Platform = Depends(get_platform)) -> Hea
     ping = getattr(platform.jobs.queue, "ping", None)
     checks["queue"] = ping() if callable(ping) else True
     checks["queue_backend"] = platform.jobs.queue.backend_name
-    ok = all(v for k, v in checks.items() if k != "queue_backend")
+    checks["task_versions"] = platform.registry.supported_versions()
+    checks["task_version_skew"] = platform.tasks.version_skew()
+    info = ("queue_backend", "task_versions", "task_version_skew")
+    ok = all(v for k, v in checks.items() if k not in info)
     if not ok:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return HealthResponse(status="ready" if ok else "not_ready", checks=checks)

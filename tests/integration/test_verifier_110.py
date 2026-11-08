@@ -172,3 +172,65 @@ def test_attack_catalogue_history_preserved() -> None:
     assert set(attack_catalog.known_at("1.1.0")) == dev | {"universal_equality"}
     assert set(attack_catalog.heldout_at("1.1.0")) == held - {"universal_equality"}
     assert len(attack_catalog.heldout_at("1.1.0")) == 4
+
+
+# ---------------------------------------------------------------- review follow-ups (PR #2)
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        "class A:\n    __eq__ = lambda self, other: True\n",
+        "class A:\n    __ne__: object = lambda self, other: False\n",
+        "class A:\n    __lt__, __gt__ = (lambda s, o: True), (lambda s, o: True)\n",
+        "class A:\n    (__ge__ := (lambda s, o: True))\n",
+        "def always(s, o):\n    return True\nA = type('A', (), {'__eq__': always})\n",
+        "def always(s, o):\n    return True\nA = type('A', (), dict(__eq__=always))\n",
+        "from re import match as __le__\n",
+        "class A:\n    for __eq__ in [lambda s, o: True]:\n        pass\n",
+    ],
+    ids=[
+        "assign",
+        "annassign",
+        "tuple",
+        "walrus",
+        "type-dict",
+        "type-kwargs",
+        "import-alias",
+        "for",
+    ],
+)
+def test_scanner_rejects_non_def_comparison_bindings(src: str) -> None:
+    codes = {f.code for f in scan_source("app/x.py", src, ("re",)).findings}
+    assert "comparison_dunder_definition" in codes
+
+
+def test_provenance_hash_covers_comparison_rule() -> None:
+    from traceforge.application.reproducibility import verifier_provenance
+
+    prov = verifier_provenance()
+    assert prov["verifier_version"] == "1.1.0"
+    assert prov["static_safety"]["forbidden_comparison_dunders"] == sorted(
+        FORBIDDEN_COMPARISON_DUNDERS
+    )
+
+
+def test_universal_equality_not_attributed_to_reward_policy() -> None:
+    e = attack_catalog.entry("universal_equality")
+    assert e.known_to_verifier_versions == ("1.1.0",) and e.reward_policies_known == ()
+
+
+def test_rollout_request_pins_concrete_task_version(platform: Any) -> None:
+    from fastapi.testclient import TestClient
+
+    from traceforge.api.app import create_app
+    from traceforge.contracts.jobs import JobKind
+
+    with TestClient(create_app(platform=platform)) as client:
+        r = client.post("/api/v1/rollouts", json={"task_id": "sqli-t0-s000"})
+        assert r.status_code == 202, r.text
+    with platform.db.session() as s:
+        from traceforge.infrastructure.database import models as m
+
+        job = s.query(m.Job).filter(m.Job.kind == JobKind.ROLLOUT.value).one()
+        assert job.input["request"]["task_version"] == "1.1.0"

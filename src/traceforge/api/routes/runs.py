@@ -36,7 +36,9 @@ def create_rollout(
     cid: str = Depends(correlation_id),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
 ) -> JobAcceptedResponse:
-    platform.registry.spec(body.task_id, body.task_version)  # 404 early for unknown tasks
+    # 404 early for unknown tasks; pin the concrete version at acceptance so a queued or retried
+    # job cannot silently switch task versions across a deployment.
+    task_version = platform.registry.spec(body.task_id, body.task_version).version
     platform.policies.get(body.reward_policy)  # 404 early for unknown policies
     if (
         body.provider.kind != "demo"
@@ -51,7 +53,7 @@ def create_rollout(
     rollout_id = uuid.uuid5(ROLLOUT_NS, idempotency_key) if idempotency_key else uuid.uuid4()
     request = RolloutRequest(
         task_id=body.task_id,
-        task_version=body.task_version,
+        task_version=task_version,
         provider=body.provider,
         sandbox=platform.sandbox.name,
         reward_policy=body.reward_policy,

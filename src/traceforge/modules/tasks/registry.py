@@ -5,7 +5,13 @@ from __future__ import annotations
 import fnmatch
 from collections.abc import Iterable
 
-from traceforge.contracts.common import ConflictError, NotFoundError, sha256_json, sha256_text
+from traceforge.contracts.common import (
+    ConflictError,
+    NotFoundError,
+    UnsupportedTaskVersion,
+    sha256_json,
+    sha256_text,
+)
 from traceforge.contracts.tasks import (
     ResourceBudget,
     Split,
@@ -68,23 +74,49 @@ def is_protected(path: str) -> bool:
     return any(fnmatch.fnmatchcase(path, g) for g in PROTECTED_GLOBS)
 
 
-def build_bundle(family: TaskFamily, template_id: str, seed: int) -> TaskBundle:
-    rendered: RenderedTask = family.render(template_id, seed)
+# Every task version this code can build. 1.0.0 is historical (re-verification of rollouts
+# recorded against it); 1.1.0 is current. Each profile fixes generator, verifier and oracle versions.
+VERSION_PROFILES: dict[str, dict[str, str]] = {
+    "1.0.0": {"generator": "1.0.0", "verifier": "1.0.0", "oracle": "1.0.0"},
+    "1.1.0": {"generator": GENERATOR_VERSION, "verifier": VERIFIER_VERSION, "oracle": "1.1.0"},
+}
+HISTORICAL_TASK_VERSIONS: tuple[str, ...] = ("1.0.0",)
+
+
+def build_bundle(
+    family: TaskFamily, template_id: str, seed: int, version: str = TASK_VERSION
+) -> TaskBundle:
+    if version not in VERSION_PROFILES:
+        raise UnsupportedTaskVersion(
+            f"task version {version} cannot be built by this TraceForge release "
+            f"(buildable: {sorted(VERSION_PROFILES)})"
+        )
+    profile = VERSION_PROFILES[version]
+    rendered: RenderedTask = family.render(template_id, seed, oracle_version=profile["oracle"])
     task_id = task_id_for(family, template_id, seed)
     hidden = {HIDDEN_TEST_MODULE: rendered.hidden_tests}
     fixture_hash = sha256_json({"workspace": rendered.workspace_files, "hidden": hidden})
+    if version == "1.0.0":
+        from traceforge.modules.tasks.families.legacy_1_0_0 import FIXTURE_HASHES_1_0_0
+
+        pinned = FIXTURE_HASHES_1_0_0.get(task_id)
+        if pinned != fixture_hash:
+            raise ConflictError(
+                f"historical bundle {task_id}@1.0.0 does not reproduce its pinned fixture hash "
+                f"({fixture_hash[:12]} != {str(pinned)[:12]}); refusing to register a substitute"
+            )
     visible = tuple(
         VisibleFile(path=p, sha256=sha256_text(c), editable=is_editable(p))
         for p, c in sorted(rendered.workspace_files.items())
     )
     spec = TaskSpec(
         task_id=task_id,
-        version=TASK_VERSION,
+        version=version,
         category=family.category,
         title=f"{family.title} ({rendered.target_function})",
         objective=_objective_from(rendered),
         allowed_tools=AGENT_TOOLS,
-        environment_ref=f"local-fixture:{family.family_id}/{template_id}@{GENERATOR_VERSION}",
+        environment_ref=f"local-fixture:{family.family_id}/{template_id}@{profile['generator']}",
         budget=ResourceBudget(),
         visible_files=visible,
         difficulty=rendered.difficulty,
@@ -96,12 +128,12 @@ def build_bundle(family: TaskFamily, template_id: str, seed: int) -> TaskBundle:
     )
     oracle = TaskOracleSpec(
         task_id=task_id,
-        version=TASK_VERSION,
+        version=version,
         verifier_id=VERIFIER_ID,
-        verifier_version=VERIFIER_VERSION,
+        verifier_version=profile["verifier"],
         family_id=family.family_id,
         template_id=template_id,
-        generator_version=GENERATOR_VERSION,
+        generator_version=profile["generator"],
         seed=seed,
         split=assign_split(family, template_id, seed),
         hidden_test_module=HIDDEN_TEST_MODULE,
@@ -131,7 +163,12 @@ class TaskRegistry:
         self._bundles: dict[str, TaskBundle] = {}
         self._latest: dict[str, str] = {}
 
-    def register(self, bundle: TaskBundle) -> None:
+    def register(self, bundle: TaskBundle, *, historical: bool = False) -> None:
+        """Register an immutable task version.
+
+        Current versions are listed and used for new work; ``historical`` versions are reachable
+        only by explicit version (re-verification of rollouts recorded against them).
+        """
         key = bundle.spec.key
         existing = self._bundles.get(key)
         if existing is not None:
@@ -139,14 +176,40 @@ class TaskRegistry:
                 raise ConflictError(f"task version {key} is immutable and already registered")
             return
         self._bundles[key] = bundle
-        self._latest[bundle.spec.task_id] = bundle.spec.version
+        if not historical:
+            self._latest[bundle.spec.task_id] = bundle.spec.version
+
+    def all_bundles(self) -> list[TaskBundle]:
+        """Every registered version, current and historical (for persistence, not selection)."""
+        return sorted(self._bundles.values(), key=lambda b: (b.spec.task_id, b.spec.version))
+
+    def current_keys(self) -> list[tuple[str, str]]:
+        return sorted(self._latest.items())
+
+    def versions(self, task_id: str) -> list[str]:
+        return sorted(b.spec.version for b in self._bundles.values() if b.spec.task_id == task_id)
+
+    def supported_versions(self) -> dict[str, list[str]]:
+        """Versions this instance can execute: {"current": [...], "historical": [...]}."""
+        current = sorted(set(self._latest.values()))
+        every = sorted({b.spec.version for b in self._bundles.values()})
+        return {"current": current, "historical": [v for v in every if v not in current]}
 
     def bundle(self, task_id: str, version: str | None = None) -> TaskBundle:
-        version = version or self._latest.get(task_id)
-        bundle = self._bundles.get(f"{task_id}@{version}")
-        if bundle is None:
-            raise NotFoundError(f"unknown task {task_id}@{version}")
-        return bundle
+        resolved = version or self._latest.get(task_id)
+        bundle = self._bundles.get(f"{task_id}@{resolved}")
+        if bundle is not None:
+            return bundle
+        known = self.versions(task_id)
+        if known and version is not None:
+            # The task exists but not in this version: never substitute another version.
+            raise UnsupportedTaskVersion(
+                f"task {task_id}@{version} is not available on this instance (available: "
+                f"{known}). Run it on an instance that supports {version}, or re-verify with the "
+                "TraceForge commit recorded in the rollout's reproducibility bundle.",
+                details={"task_id": task_id, "requested": version, "available": known},
+            )
+        raise NotFoundError(f"unknown task {task_id}@{resolved}")
 
     def spec(self, task_id: str, version: str | None = None) -> TaskSpec:
         return self.bundle(task_id, version).spec
@@ -156,25 +219,37 @@ class TaskRegistry:
     ) -> list[TaskBundle]:
         split_set = set(splits) if splits else None
         family_set = set(families) if families else None
+        current = (self._bundles[f"{t}@{v}"] for t, v in self._latest.items())
         out = [
             b
-            for b in self._bundles.values()
+            for b in current
             if (split_set is None or b.oracle.split in split_set)
             and (family_set is None or b.oracle.family_id in family_set)
         ]
         return sorted(out, key=lambda b: b.spec.task_id)
 
     def __len__(self) -> int:
-        return len(self._bundles)
+        return len(self._latest)
 
 
-def default_registry(seeds: dict[str, int] | None = None) -> TaskRegistry:
+def default_registry(
+    seeds: dict[str, int] | None = None,
+    *,
+    current_version: str = TASK_VERSION,
+    historical_versions: tuple[str, ...] = HISTORICAL_TASK_VERSIONS,
+) -> TaskRegistry:
+    """Current task versions plus the historical versions kept for re-verification."""
     registry = TaskRegistry()
     seeds = seeds or DEFAULT_SEEDS
     for family in FAMILIES.values():
         for template_id in family.templates:
             for seed in range(seeds.get(template_id, 0)):
-                registry.register(build_bundle(family, template_id, seed))
+                for v in historical_versions:
+                    if v != current_version:
+                        registry.register(
+                            build_bundle(family, template_id, seed, v), historical=True
+                        )
+                registry.register(build_bundle(family, template_id, seed, current_version))
     return registry
 
 

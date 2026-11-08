@@ -96,9 +96,10 @@ class TaskService:
         self.db, self.registry, self.artifacts = db, registry, artifacts
 
     def sync_registry(self) -> int:
-        """Persist every registered task version. Oracle material goes to a restricted prefix."""
+        """Persist every registered task version (current and historical). Oracle material goes
+        to a restricted prefix. Safe to run concurrently from several processes."""
         count = 0
-        for bundle in self.registry.list():
+        for bundle in self.registry.all_bundles():
             oracle_doc = json.dumps(
                 {
                     "oracle": bundle.oracle.model_dump(mode="json"),
@@ -113,6 +114,17 @@ class TaskService:
                 TaskRepository(s).upsert_bundle(bundle, oracle_id)
             count += 1
         return count
+
+    def version_skew(self) -> list[str]:
+        """Task versions present in the shared database that this instance cannot execute
+        (e.g. synced by a newer release during a rolling upgrade). Informational: such versions
+        are neither advertised nor executed here; requests for them get a 409."""
+        executable = set(self.registry.supported_versions()["current"]) | set(
+            self.registry.supported_versions()["historical"]
+        )
+        with self.db.session() as s:
+            stored = set(s.scalars(select(m.TaskVersion.version).distinct()))
+        return sorted(stored - executable)
 
 
 # ----------------------------------------------------------------------------- ingestion
