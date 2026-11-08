@@ -1,0 +1,12 @@
+# cpu-test: tiny locally-initialised model, real optimizer steps, no download (integration check).
+# For real SFT set mode: sft, base_model to a local HF model directory, and use_lora: true.
+mode: cpu-test
+base_model: tiny-random-local
+max_length: 8192
+epochs: 3
+max_steps: 20
+learning_rate: 0.0005
+batch_size: 1
+seed: 0
+use_lora: true
+lora: {r: 8, alpha: 16, dropout: 0.05}

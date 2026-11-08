@@ -1,0 +1,13 @@
+# Online GRPO via TRL environment_factory. Requires: transformers>=5.2, TRL with
+# environment_factory, a local chat model with tool-calling template, and the docker sandbox.
+base_model: /path/to/local/chat-model
+allow_download: false
+max_steps: 10
+per_device_train_batch_size: 2
+num_generations: 2
+max_completion_length: 512
+max_tool_calling_iterations: 12
+learning_rate: 1.0e-6
+beta: 0.0
+seed: 0
+reward_policy: verified-v1

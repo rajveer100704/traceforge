@@ -1,0 +1,15 @@
+# Benchmark a real model through an OpenAI-compatible endpoint. Requires the docker sandbox
+# (TRACEFORGE_SANDBOX_PROVIDER=docker) because model output is untrusted code.
+name: heldout-model
+splits: [validation, public_test, private_test]
+provider:
+  kind: openai_compatible
+  base_url: http://localhost:8001/v1
+  model_id: your-model-id
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.0
+  max_tokens: 1024
+  seed: 0
+sandbox: docker
+reward_policy: verified-v1
+verifier_profile: v3_full

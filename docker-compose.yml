@@ -1,0 +1,75 @@
+# Local platform dependencies. Sandbox containers are NOT created by Compose: they are started by
+# the host-controlled DockerSandboxProvider, with network_mode=none, and never join this network.
+# The API/worker services below do not mount the Docker socket; to use the docker sandbox, run the
+# worker on the host (`uv run traceforge worker`) where it can reach the local Docker daemon.
+name: traceforge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-traceforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-traceforge}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-traceforge}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-traceforge}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-local-only}
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: [miniodata:/data]
+
+  api:
+    build: {context: ., dockerfile: deployments/docker/Dockerfile}
+    profiles: ["app"]
+    env_file: [.env]
+    environment:
+      TRACEFORGE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-traceforge}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-traceforge}
+      TRACEFORGE_REDIS_URL: redis://redis:6379/0
+      TRACEFORGE_QUEUE_BACKEND: rq
+      TRACEFORGE_STORAGE_BACKEND: s3
+      TRACEFORGE_S3_ENDPOINT_URL: http://minio:9000
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  worker:
+    build: {context: ., dockerfile: deployments/docker/Dockerfile}
+    profiles: ["app"]
+    command: ["traceforge", "worker"]
+    env_file: [.env]
+    environment:
+      TRACEFORGE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-traceforge}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-traceforge}
+      TRACEFORGE_REDIS_URL: redis://redis:6379/0
+      TRACEFORGE_QUEUE_BACKEND: rq
+      TRACEFORGE_STORAGE_BACKEND: s3
+      TRACEFORGE_S3_ENDPOINT_URL: http://minio:9000
+    depends_on: [api]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    profiles: ["observability"]
+    volumes: ["./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:9090:9090"]
+
+volumes:
+  pgdata:
+  miniodata:

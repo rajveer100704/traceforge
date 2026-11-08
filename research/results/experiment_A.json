@@ -1,0 +1,74 @@
+{
+  "experiment": "A_trajectory_quality",
+  "n_trajectories": 81,
+  "n_verified_rollouts": 72,
+  "n_imported_example_records": 9,
+  "quality_status_counts": {
+    "accepted": 77,
+    "duplicate": 1,
+    "rejected": 3
+  },
+  "accepted": 77,
+  "levels": {
+    "d1_raw": {
+      "selected": 81,
+      "rows_by_split": {
+        "train": 45,
+        "validation": 36
+      },
+      "verified_success_fraction": 0.30864197530864196,
+      "misleading_claimed_success": 51,
+      "misleading_fraction": 0.6296296296296297,
+      "dataset_version": "v-0d079251223a",
+      "rejection_summary": {}
+    },
+    "d2_schema_valid": {
+      "selected": 77,
+      "rows_by_split": {
+        "train": 41,
+        "validation": 36
+      },
+      "verified_success_fraction": 0.3116883116883117,
+      "misleading_claimed_success": 50,
+      "misleading_fraction": 0.6493506493506493,
+      "dataset_version": "v-28bec391c6dd",
+      "rejection_summary": {
+        "excluded_by_d2_schema_valid:duplicate": 1,
+        "excluded_by_d2_schema_valid:rejected": 3
+      }
+    },
+    "d3_verified_success": {
+      "selected": 24,
+      "rows_by_split": {
+        "train": 12,
+        "validation": 12
+      },
+      "verified_success_fraction": 1.0,
+      "misleading_claimed_success": 0,
+      "misleading_fraction": 0.0,
+      "dataset_version": "v-b0661538379e",
+      "rejection_summary": {
+        "excluded_by_d3_verified_success:accepted": 53,
+        "excluded_by_d3_verified_success:duplicate": 1,
+        "excluded_by_d3_verified_success:rejected": 3
+      }
+    },
+    "d4_verified_plus_informative": {
+      "selected": 48,
+      "rows_by_split": {
+        "train": 24,
+        "validation": 24
+      },
+      "verified_success_fraction": 0.5,
+      "misleading_claimed_success": 24,
+      "misleading_fraction": 0.5,
+      "dataset_version": "v-d576192b4f17",
+      "rejection_summary": {
+        "excluded_by_d4_verified_plus_informative:accepted": 29,
+        "excluded_by_d4_verified_plus_informative:duplicate": 1,
+        "excluded_by_d4_verified_plus_informative:rejected": 3
+      }
+    }
+  },
+  "downstream_sft": "NOT EXECUTED: downstream SFT comparison across D1\u2013D4 requires a real base model; only cpu-test integration is available here (sft mode: available on CPU only (no CUDA); practical only for tiny models)"
+}

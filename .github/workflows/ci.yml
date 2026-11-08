@@ -1,0 +1,50 @@
+name: CI
+on:
+  push: {branches: [main]}
+  pull_request:
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {version: "0.10.7"}
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check src tests scripts && uv run ruff format --check src tests scripts
+      - name: Type check
+        run: uv run mypy
+      - name: Migration consistency
+        run: uv run traceforge db check
+      - name: Tests (unit, property, contract, security, integration, e2e; docker/postgres auto-skip)
+        run: uv run pytest -q --cov=traceforge --cov-report=xml
+      - name: Demo smoke test
+        run: uv run traceforge demo --profile local
+        env: {TRACEFORGE_DATA_DIR: .traceforge-ci}
+      - name: Build package
+        run: uv build
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: {POSTGRES_USER: tf, POSTGRES_PASSWORD: tf, POSTGRES_DB: tf}
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U tf" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {version: "0.10.7"}
+      - run: uv sync --frozen
+      - run: uv run pytest -q -m postgres
+        env: {TRACEFORGE_TEST_POSTGRES_URL: "postgresql+psycopg://tf:tf@localhost:5432/tf"}
+  ml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {version: "0.10.7"}
+      - run: uv sync --frozen --extra ml
+      - run: uv run pytest -q tests/integration/test_training_and_docker.py tests/contract

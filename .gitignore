@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Runtime data, artifacts, models
+.traceforge/
+mlruns/
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+datasets/generated/
+logs/
+*.log

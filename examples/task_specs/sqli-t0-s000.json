@@ -1,0 +1,56 @@
+{
+  "task_id": "sqli-t0-s000",
+  "version": "1.0.0",
+  "domain": "cybersecurity",
+  "category": "sql_injection_remediation",
+  "title": "SQL injection remediation (lookup_tenant)",
+  "objective": "The function `lookup_tenant` in `app/tenant_directory.py` builds SQL by string interpolation and is vulnerable to SQL injection. Fix it (for example with parameterised queries) while preserving its legitimate behaviour.",
+  "allowed_tools": [
+    "list_files",
+    "read_file",
+    "apply_patch",
+    "run_visible_tests",
+    "inspect_test_output",
+    "submit_evidence",
+    "submit_final_report"
+  ],
+  "environment_ref": "local-fixture:sql_injection/t0@1.0.0",
+  "budget": {
+    "max_actions": 20,
+    "max_wall_seconds": 120.0,
+    "max_tokens": 32000,
+    "max_cost_usd": 0.0,
+    "test_timeout_seconds": 20.0,
+    "cpu_limit": 1.0,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "visible_files": [
+    {
+      "path": "TASK.md",
+      "sha256": "20bc426250d0a28c2a696248dbb6abbfd156fd51b94be3d3f374fab730258594",
+      "editable": false
+    },
+    {
+      "path": "app/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "editable": false
+    },
+    {
+      "path": "app/tenant_directory.py",
+      "sha256": "c62b74edd84f976c371adf7e05b6aac0a7ca964073addc709fdce4ada2504d8b",
+      "editable": true
+    },
+    {
+      "path": "tests/test_visible.py",
+      "sha256": "431f665169adb0f07d7ba3ee01bc0a17c09abdc2e03c9a27ec86a73b40ded638",
+      "editable": false
+    }
+  ],
+  "difficulty": "easy",
+  "public_metadata": {
+    "family": "sql_injection",
+    "module": "app/tenant_directory.py",
+    "target_function": "lookup_tenant"
+  }
+}

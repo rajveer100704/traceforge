@@ -1,0 +1,30 @@
+name: Containers
+on:
+  push: {branches: [main]}
+  pull_request:
+permissions: {contents: read}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build platform image
+        run: docker build -f deployments/docker/Dockerfile -t traceforge:ci .
+      - name: Build sandbox image
+        run: docker build -t traceforge-sandbox:0.1 environments/images/sandbox
+      - name: Images run as non-root
+        run: |
+          test "$(docker run --rm traceforge:ci id -u)" != "0"
+          test "$(docker run --rm traceforge-sandbox:0.1 id -u)" != "0"
+      - name: Base images pinned by digest
+        run: |
+          grep -E '^FROM .+@sha256:[0-9a-f]{64}' environments/images/sandbox/Dockerfile
+          grep -cE '^FROM .+@sha256:[0-9a-f]{64}' deployments/docker/Dockerfile | grep -q 2
+      - name: Docker sandbox integration tests
+        run: |
+          curl -LsSf https://astral.sh/uv/0.10.7/install.sh | sh
+          ~/.local/bin/uv sync --frozen
+          ~/.local/bin/uv run pytest -q -m docker tests/integration/test_training_and_docker.py
+      - name: Image vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with: {image-ref: "traceforge:ci", severity: "CRITICAL,HIGH", exit-code: "0", format: table}

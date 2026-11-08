@@ -1,0 +1,10 @@
+# Held-out benchmark with the deterministic demo provider (pipeline validation).
+name: heldout-demo
+splits: [public_test, private_test]
+provider: {kind: demo, policy: reference, model_id: demo_provider}
+sandbox: local
+reward_policy: verified-v1
+verifier_profile: v3_full
+seed: 0
+bootstrap_samples: 2000
+confidence: 0.95

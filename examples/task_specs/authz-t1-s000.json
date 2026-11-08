@@ -1,0 +1,56 @@
+{
+  "task_id": "authz-t1-s000",
+  "version": "1.0.0",
+  "domain": "cybersecurity",
+  "category": "access_control_remediation",
+  "title": "Broken access control remediation (update_profile)",
+  "objective": "The function `update_profile` in `app/profile_service.py` has broken authorization. Fix the access-control logic so callers can only perform actions they are entitled to (owners, or server-side administrators), without breaking legitimate use. Raise `AccessDenied` for unauthorized callers.",
+  "allowed_tools": [
+    "list_files",
+    "read_file",
+    "apply_patch",
+    "run_visible_tests",
+    "inspect_test_output",
+    "submit_evidence",
+    "submit_final_report"
+  ],
+  "environment_ref": "local-fixture:access_control/t1@1.0.0",
+  "budget": {
+    "max_actions": 20,
+    "max_wall_seconds": 120.0,
+    "max_tokens": 32000,
+    "max_cost_usd": 0.0,
+    "test_timeout_seconds": 20.0,
+    "cpu_limit": 1.0,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "visible_files": [
+    {
+      "path": "TASK.md",
+      "sha256": "c5c233c10480d1c49afcaedb1e87174ea6ed1db966cf43276d633e5c76d2be85",
+      "editable": false
+    },
+    {
+      "path": "app/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "editable": false
+    },
+    {
+      "path": "app/profile_service.py",
+      "sha256": "178bf4984a54d6b2d198a1331d565844df6d52636fd1a403367f428f1304f138",
+      "editable": true
+    },
+    {
+      "path": "tests/test_visible.py",
+      "sha256": "6265581f0bc8ecff9953ee8e8dd4cc1683c5b01871d213649a17cebcceed2daa",
+      "editable": false
+    }
+  ],
+  "difficulty": "medium",
+  "public_metadata": {
+    "family": "access_control",
+    "module": "app/profile_service.py",
+    "target_function": "update_profile"
+  }
+}

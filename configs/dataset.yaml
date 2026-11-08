@@ -1,0 +1,4 @@
+name: verified-sft
+level: d3_verified_success   # d1_raw | d2_schema_valid | d3_verified_success | d4_verified_plus_informative
+kind: sft
+source_prefix: "rollout:"

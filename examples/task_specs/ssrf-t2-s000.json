@@ -1,0 +1,56 @@
+{
+  "task_id": "ssrf-t2-s000",
+  "version": "1.0.0",
+  "domain": "cybersecurity",
+  "category": "ssrf_prevention",
+  "title": "SSRF prevention and remediation (fetch_with_redirects)",
+  "objective": "`fetch_with_redirects` in `app/url_proxy.py` follows HTTP redirects without re-validating each hop, allowing server-side request forgery to internal destinations. Fix it so every destination (including redirect targets) is validated before it is fetched.",
+  "allowed_tools": [
+    "list_files",
+    "read_file",
+    "apply_patch",
+    "run_visible_tests",
+    "inspect_test_output",
+    "submit_evidence",
+    "submit_final_report"
+  ],
+  "environment_ref": "local-fixture:ssrf/t2@1.0.0",
+  "budget": {
+    "max_actions": 20,
+    "max_wall_seconds": 120.0,
+    "max_tokens": 32000,
+    "max_cost_usd": 0.0,
+    "test_timeout_seconds": 20.0,
+    "cpu_limit": 1.0,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "visible_files": [
+    {
+      "path": "TASK.md",
+      "sha256": "235094816eb2c1c9fa3c58b8d2075f6d0aad99eb93e1f92b6c88eec4b28cea6b",
+      "editable": false
+    },
+    {
+      "path": "app/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "editable": false
+    },
+    {
+      "path": "app/url_proxy.py",
+      "sha256": "928c997cdc174ad328259780c547a4119e32b76902ba9f4b80be59779a67d835",
+      "editable": true
+    },
+    {
+      "path": "tests/test_visible.py",
+      "sha256": "cbe0e47cab548bc81a8d8811a281578315d818b40be0b69fdfe0f98290495acb",
+      "editable": false
+    }
+  ],
+  "difficulty": "hard",
+  "public_metadata": {
+    "family": "ssrf",
+    "module": "app/url_proxy.py",
+    "target_function": "fetch_with_redirects"
+  }
+}

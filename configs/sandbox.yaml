@@ -1,0 +1,13 @@
+# Reference values for sandbox limits (per-task budgets live in TaskSpec.budget).
+default_provider: local          # local (process, trusted demo only) | docker (container isolation)
+docker:
+  image: traceforge-sandbox:0.1
+  user: "65534:65534"
+  network_mode: none
+  read_only_rootfs: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: "/tmp:rw,noexec,nosuid,size=16m"
+  memory_mb: 256
+  cpus: 1.0
+  pids_limit: 64

@@ -1,0 +1,12 @@
+# Additional reward policies can be registered here (PolicyRegistry.load_yaml).
+# Existing (policy_id, version) pairs are immutable: bump the version to change weights.
+policies:
+  - policy_id: verified-v1-strict-evidence
+    version: 1.0.0
+    description: Like verified-v1 but evidence carries more weight (still gated on correctness).
+    components:
+      - {kind: task_completion, weight: 0.6}
+      - {kind: regression_quality, weight: 0.1}
+      - {kind: evidence_quality, weight: 0.25}
+      - {kind: efficiency, weight: 0.05}
+    hard_gates: [authoritative, verdict_pass, safety, regression, evidence_integrity]
