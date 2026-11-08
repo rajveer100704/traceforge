@@ -27,8 +27,10 @@ NAMES = {
 
 def _write(out_dir: Path, stem: str, doc: dict[str, Any], md: str) -> dict[str, str]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / f"{stem}.json").write_text(json.dumps(doc, indent=2, default=str), encoding="utf-8")
-    (out_dir / f"{stem}.md").write_text(md, encoding="utf-8")
+    (out_dir / f"{stem}.json").write_text(
+        json.dumps(doc, indent=2, default=str), encoding="utf-8", newline="\n"
+    )
+    (out_dir / f"{stem}.md").write_text(md, encoding="utf-8", newline="\n")
     return {"json": str(out_dir / f"{stem}.json"), "markdown": str(out_dir / f"{stem}.md")}
 
 
