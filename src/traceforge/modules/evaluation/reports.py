@@ -45,11 +45,10 @@ def benchmark_document(
         "cancelled": result.cancelled,
         "demo_provider": demo,
         "disclaimer": DEMO_DISCLAIMER if demo else None,
-        "leakage": {
-            "ok": result.leakage.ok,
-            "problems": result.leakage.problems,
-            "task_counts_by_split": result.leakage.counts_by_split,
-        },
+        "run_mode": cfg.run_mode,
+        "official": cfg.official and result.leakage.ok,
+        "evidence": result.metrics.get("evidence"),
+        "leakage": result.leakage.as_dict(),
         "metrics": result.metrics,
         "artifacts": artifacts or {},
         "extra": result.extra,
@@ -73,8 +72,26 @@ def benchmark_markdown(doc: dict[str, Any]) -> str:
         f"- Split policy: `{m.get('split_policy', {}).get('id')}` v{m.get('split_policy', {}).get('version')}",
         "",
     ]
+    if not doc.get("official", True):
+        lines += [
+            "> **NON-OFFICIAL (diagnostic) RUN.** Leakage/lineage validation "
+            + ("failed" if not doc["leakage"]["ok"] else "was not enforced")
+            + "; these results must not be reported as benchmark results.",
+            "",
+        ]
     if doc.get("disclaimer"):
         lines += [f"> **Note:** {doc['disclaimer']}", ""]
+    ev = doc.get("evidence") or {}
+    if ev:
+        lines += [
+            f"- Evidence type: **{ev.get('kind')}** (learned-model evidence: "
+            f"{ev.get('learned_model_evidence')})",
+            f"- Independent tasks: **{ev.get('n_tasks')}**; episodes: {ev.get('n_episodes')}; "
+            f"seeds: {ev.get('seeds')}",
+        ]
+        if ev.get("repeated_seed_note"):
+            lines.append(f"- {ev['repeated_seed_note']}")
+        lines.append("")
     lines += [
         "## Methodology",
         "",
@@ -85,6 +102,8 @@ def benchmark_markdown(doc: dict[str, Any]) -> str:
         f"Proportions use Wilson score intervals at {cfg['confidence']:.0%} confidence; mean reward uses a",
         f"seeded percentile bootstrap ({cfg['bootstrap_samples']} resamples). Sample sizes are small;",
         "intervals are wide and no significance claims are made.",
+        "",
+        f"Statistical units: {m.get('statistical_units', 'episode-level Wilson intervals only')}",
         "",
         "## Overall",
         "",
@@ -105,6 +124,47 @@ def benchmark_markdown(doc: dict[str, Any]) -> str:
         f"| Token usage / cost | {'not reported by provider' if o['token_usage'] is None else o['token_usage']} |",
         "",
     ]
+    tc = o.get("task_clustered")
+    if tc:
+        lines += [
+            "## Task-clustered uncertainty",
+            "",
+            f"Independent tasks n = {o.get('n_tasks')}; episodes n = {o.get('n_episodes')}.",
+            "",
+            "| Metric | Estimate | Task-clustered CI | Clusters |",
+            "|---|---|---|---|",
+        ]
+        for key, label in (
+            ("verified_success", "Verified success"),
+            ("false_positive_reward_rate", "False-positive reward rate"),
+            ("hidden_security_pass_rate", "Hidden security pass rate"),
+            ("regression_failure_rate", "Regression failure rate"),
+            ("mean_reward", "Mean reward"),
+        ):
+            c = tc.get(key) or {}
+            ci = (
+                "undefined (< 2 tasks)"
+                if c.get("ci_low") is None
+                else f"[{c['ci_low']:.3f}, {c['ci_high']:.3f}]"
+            )
+            lines.append(f"| {label} | {_fmt(c.get('estimate'))} | {ci} | {c.get('n_clusters')} |")
+        lines.append("")
+    sens = m.get("reward_threshold_sensitivity")
+    if sens:
+        lines += [
+            "## Reward-threshold sensitivity",
+            "",
+            "| Threshold | Reward-positive rate | False-positive reward rate | FP (task-clustered CI) |",
+            "|---|---|---|---|",
+        ]
+        for row in sens:
+            c = row["false_positive_reward_rate_task_clustered"]
+            ci = "n/a" if c.get("ci_low") is None else f"[{c['ci_low']:.3f}, {c['ci_high']:.3f}]"
+            lines.append(
+                f"| {row['threshold']} | {_pct(row['reward_positive_rate'])} | "
+                f"{_pct(row['false_positive_reward_rate'])} | {ci} |"
+            )
+        lines.append("")
     for title, key in (
         ("By split", "by_split"),
         ("By family", "by_family"),
@@ -113,6 +173,20 @@ def benchmark_markdown(doc: dict[str, Any]) -> str:
         lines += [f"## {title}", "", "| Group | Verified success | Mean reward |", "|---|---|---|"]
         for group, g in m[key].items():
             lines.append(f"| {group} | {_pct(g['verified_success'])} | {_fmt(g['mean_reward'])} |")
+        lines.append("")
+    if m.get("task_level"):
+        lines += [
+            "## Task-level summary",
+            "",
+            "| Task | Family | Split | Episodes | Verified success | Mean reward | Consistent |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for t in m["task_level"]:
+            lines.append(
+                f"| {t['task_id']} | {t['family']} | {t['split']} | {t['n_episodes']} | "
+                f"{t['verified_success_rate']:.0%} | {t['mean_reward']:.3f} | "
+                f"{t['outcome_consistent_across_episodes']} |"
+            )
         lines.append("")
     lines += [
         "## Per-task results",
@@ -131,10 +205,14 @@ def benchmark_markdown(doc: dict[str, Any]) -> str:
         "",
         "## Split integrity",
         "",
-        f"- Leakage check: {'PASS' if leak['ok'] else 'FAIL'}; task counts by split: "
-        f"{json.dumps(leak['task_counts_by_split'])}",
+        f"- Leakage check: {'PASS' if leak['ok'] else 'FAIL'}; run mode `{doc.get('run_mode', 'official')}`; "
+        f"task counts by split: {json.dumps(leak['task_counts_by_split'])}",
+        f"- Checks: {', '.join(leak.get('checks', []))}",
+        f"- Training lineage sources: {', '.join(leak.get('training_sources') or []) or 'none declared'}"
+        f" ({len(leak.get('training_task_ids') or [])} training tasks)",
     ]
     lines += [f"- {p}" for p in leak["problems"]]
+    lines += [f"- training overlap: {p}" for p in leak.get("training_overlap") or []]
     lines += [
         "",
         "## Limitations",

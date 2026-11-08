@@ -1,0 +1,26 @@
+# Experiment G — base vs SFT vs SFT+GRPO under one benchmark configuration.
+#
+# Every arm is evaluated with the same splits, seeds, reward policy and verifier profile; only the
+# provider (and its declared training lineage) differs. Arms without a provider are reported as
+# NOT EXECUTED. `pipeline_check` is the scripted reference policy: it validates the harness and
+# metric plumbing and is NOT a learned model.
+benchmark:
+  splits: [public_test, private_test]
+  seeds: [0, 1, 2]
+  reward_policy: verified-v1
+  verifier_profile: v3_full
+  sandbox: local
+pricing:              # optional USD per 1K tokens for cost estimates; null = not reported
+  prompt_per_1k: null
+  completion_per_1k: null
+arms:
+  pipeline_check:
+    provider: {kind: demo, policy: reference, model_id: demo_provider}
+  base:
+    provider: null    # {kind: openai_compatible, base_url: http://127.0.0.1:8001/v1, model_id: ..., api_key_env: ...}
+  sft:
+    provider: null
+    training_run_ids: []
+  sft_grpo:
+    provider: null
+    training_run_ids: []

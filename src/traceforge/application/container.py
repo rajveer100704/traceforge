@@ -151,6 +151,7 @@ class Platform:
             ),
             jobs=jobs,
         )
+        platform.evaluations.platform = platform  # lineage resolution needs DB + store
         if isinstance(queue, InlineQueue):
             queue.bind(jobs.execute)
         platform.register_handlers()

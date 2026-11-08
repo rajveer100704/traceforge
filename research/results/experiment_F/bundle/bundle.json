@@ -1,0 +1,304 @@
+{
+  "bundle_format_version": "1",
+  "checkpoints": [
+    {
+      "arm": "d1_raw",
+      "seed": 0,
+      "sha256": "a40dfe89048a5842b70d43fdc59ef9013be5a057d1ae6730f02733a221f255ea"
+    },
+    {
+      "arm": "d1_raw",
+      "seed": 1,
+      "sha256": "cca9dfc6b9a10055ae34c4d455c2bbd3d35e73dcf256f9525dfc177b7dd442f0"
+    },
+    {
+      "arm": "d1_raw",
+      "seed": 2,
+      "sha256": "f878523657f8163f9e8962367b04da02ae4be4683e28257655ea74f290c08368"
+    },
+    {
+      "arm": "d2_schema_valid",
+      "seed": 0,
+      "sha256": "7aeb8f5d91dfa24840065f8ed76ba8b9f9e8a165bd6158993e9e5b6147be01a6"
+    },
+    {
+      "arm": "d2_schema_valid",
+      "seed": 1,
+      "sha256": "ab922aa43e357cd6ab03c242588ee02fee4b026fc6b7726696dd6aa987d15597"
+    },
+    {
+      "arm": "d2_schema_valid",
+      "seed": 2,
+      "sha256": "b3c354ee747a51ba1a4e3a513803550aa916f25e9fb026346e88d26520abc73c"
+    },
+    {
+      "arm": "d3_verified_success",
+      "seed": 0,
+      "sha256": "044b6db1bd2a52cced0ecb88fbb0803abcc827acdecde5d499c8bea638de6580"
+    },
+    {
+      "arm": "d3_verified_success",
+      "seed": 1,
+      "sha256": "5227aac9aab54305b161d8c6c60ca853dcc90f5561d2ef3288408c07683ea48b"
+    },
+    {
+      "arm": "d3_verified_success",
+      "seed": 2,
+      "sha256": "38e2f1d190a53fb2c60b75757fd73d61d7a24c0febd0d78a58f169c6db3d69b0"
+    },
+    {
+      "arm": "d4_verified_plus_informative",
+      "seed": 0,
+      "sha256": "61624b2bcaf36f76aef09264d0526c95ed8bdc20906fe58f2ef12f7c8aa89f63"
+    },
+    {
+      "arm": "d4_verified_plus_informative",
+      "seed": 1,
+      "sha256": "1264df0709675ec7b69f7256ff67fb8459aac34d8155896f9a67d9991baec9d3"
+    },
+    {
+      "arm": "d4_verified_plus_informative",
+      "seed": 2,
+      "sha256": "c7a625551ed7b47e96c401dee843695f50a06b105e89cae5937c82f50ed48436"
+    }
+  ],
+  "configs": {
+    "experiment_F": {
+      "config": {
+        "evaluation": {
+          "providers": {},
+          "seeds": [
+            0,
+            1,
+            2
+          ],
+          "splits": [
+            "private_test"
+          ]
+        },
+        "seeds": [
+          0,
+          1,
+          2
+        ],
+        "training": {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "batch_size": 1,
+          "device": null,
+          "epochs": 1,
+          "learning_rate": 0.0005,
+          "max_length": 4096,
+          "max_steps": 4,
+          "mode": "cpu-test",
+          "precision": "auto",
+          "use_lora": true
+        }
+      },
+      "config_hash": "a84265fa359df2f34c7013f163f2aa0e90fe50bc469654f9bc8e7642bf5bdd81"
+    }
+  },
+  "created_at": "2026-11-08T20:30:34.956129+00:00",
+  "datasets": [
+    {
+      "content_hash": "410266e263deccbb07f5fd2065d8208d8526450eba3a863d4d77eaf1be0f841e",
+      "dataset_version": "v-410266e263de",
+      "level": "d1_raw",
+      "rows_by_split": {
+        "train": 45,
+        "validation": 36
+      }
+    },
+    {
+      "content_hash": "6de0a285bdccd4d87e000093a5420d148b1b5e5cdb1dbc3b4abbd44fffdcbf1d",
+      "dataset_version": "v-6de0a285bdcc",
+      "level": "d2_schema_valid",
+      "rows_by_split": {
+        "train": 41,
+        "validation": 36
+      }
+    },
+    {
+      "content_hash": "999f7f7c9c6f5014e018ea15c24881ce0e5abb742e94cdd6fd2bca05ac6e3d09",
+      "dataset_version": "v-999f7f7c9c6f",
+      "level": "d3_verified_success",
+      "rows_by_split": {
+        "train": 12,
+        "validation": 12
+      }
+    },
+    {
+      "content_hash": "7e0c8388e04b5712dc2910bccdcbb0e7617c79ce3e343f5af41af42de7c1109b",
+      "dataset_version": "v-7e0c8388e04b",
+      "level": "d4_verified_plus_informative",
+      "rows_by_split": {
+        "train": 24,
+        "validation": 24
+      }
+    }
+  ],
+  "environment": {
+    "cpu_count": 12,
+    "device": {
+      "cuda_available": false,
+      "cuda_version": null,
+      "cudnn_version": null,
+      "device": "cpu",
+      "device_type": "cpu",
+      "gpu_count": 0,
+      "gpu_memory_gb": [],
+      "gpu_names": [],
+      "precision": "fp32",
+      "requested_device": "auto",
+      "requested_precision": "auto",
+      "torch_version": "2.15.0+cpu"
+    },
+    "implementation": "CPython",
+    "machine": "AMD64",
+    "packages": {
+      "accelerate": "1.15.0",
+      "datasets": "5.1.0",
+      "peft": "0.21.2",
+      "torch": "2.15.0",
+      "traceforge": "0.1.0",
+      "transformers": "5.22.2",
+      "trl": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26100-SP0",
+    "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python": "3.12.12"
+  },
+  "episodes": {
+    "count": 72,
+    "file": "episodes.jsonl.gz",
+    "reason": null
+  },
+  "evaluation_ids": [],
+  "experiment": "F",
+  "files_sha256": {
+    "REPRODUCE.md": "771fd7552bcec583886c9c293c9fa6936c86974c6005a7239243ff74e65fd8a9",
+    "episodes.jsonl.gz": "99510424b6f63e9b286c70792da2c335041ac1f5b57a32e538d928e21b2ffb64",
+    "metrics.json": "90aada1bb327c4ce8038ec0c08d248f8c19518c641934faa3e414e3d3a816c58"
+  },
+  "git": {
+    "branch": "feat/v0.2-research-integrity",
+    "commit": "c5d242b993a4a5aa728ff38304b894f12b5f34fd",
+    "dirty": true,
+    "dirty_files": [
+      "M .github/workflows/container.yml",
+      " M SECURITY.md",
+      " M deployments/docker/Dockerfile",
+      " M docs/benchmark-protocol.md",
+      " M docs/experiment-protocol.md",
+      " M environments/images/sandbox/Dockerfile",
+      " M src/traceforge/application/container.py",
+      " M src/traceforge/application/experiments.py",
+      " M src/traceforge/application/rollouts.py",
+      " M src/traceforge/application/services.py",
+      " M src/traceforge/application/training.py",
+      " M src/traceforge/cli.py",
+      " M src/traceforge/contracts/experiments.py",
+      " M src/traceforge/modules/agents/providers/demo.py",
+      " M src/traceforge/modules/evaluation/contamination.py",
+      " M src/traceforge/modules/evaluation/experiments.py",
+      " M src/traceforge/modules/evaluation/metrics.py",
+      " M src/traceforge/modules/evaluation/reports.py",
+      " M src/traceforge/modules/evaluation/runner.py",
+      " M src/traceforge/modules/evaluation/statistics.py",
+      " M src/traceforge/modules/training/grpo/adapter.py",
+      " M src/traceforge/modules/training/grpo/trainer.py",
+      " M src/traceforge/modules/training/sft/trainer.py"
+    ]
+  },
+  "models": [
+    {
+      "model_id": "tiny-random-local",
+      "pretrained": false,
+      "revision": null,
+      "tokenizer": "byte-level CharTokenizer (cpu-test)"
+    }
+  ],
+  "provenance": {
+    "attack_catalog_version": "1",
+    "dataset_split_policy": {
+      "id": "task-split-or-hash",
+      "version": "1"
+    },
+    "dataset_transformation": {
+      "id": "traceforge.dataset_builder",
+      "version": "1.0.0"
+    },
+    "leakage_checks_version": "2",
+    "n_tasks": 39,
+    "reward_policies": {
+      "self-report-r1": {
+        "policy_hash": "1c453fdd4a7319a49fcc82c7184593ad16b6138f70e24f7962c97ab9f57ea090",
+        "version": "1.0.0"
+      },
+      "verified-v1": {
+        "policy_hash": "34d1e4c5ce337706eca4aefc1327bdf81e721417cf825d5de38e83d6ed6cd371",
+        "version": "1.0.0"
+      },
+      "visible-tests-r2": {
+        "policy_hash": "da4ee2f7dcfa9aa05c712dc7ae5646317aba4c4790952b5b830cdd37ac3726b1",
+        "version": "1.0.0"
+      }
+    },
+    "task_catalogue_hash": "40ba5dc00b4e114e7265228a08c2d17d33e21cc7b93ff6676ee84c50c4eb8ed0",
+    "task_generator_version": "1.0.0",
+    "task_split_policy": {
+      "id": "template-holdout",
+      "version": "1"
+    },
+    "task_version": "1.0.0",
+    "traceforge_version": "0.1.0",
+    "verifier": {
+      "config_hash": "c6d888268ddee0a67144acb85113942dc1c77beb97fd9b1bc67d1ab6ab0b20e4",
+      "hidden_test_module": "test_hidden.py",
+      "static_safety": {
+        "allowed_dunder_attrs": [
+          "__doc__",
+          "__init__",
+          "__name__"
+        ],
+        "always_allowed_imports": [
+          "__future__",
+          "dataclasses",
+          "typing"
+        ],
+        "forbidden_calls": [
+          "__import__",
+          "breakpoint",
+          "compile",
+          "delattr",
+          "eval",
+          "exec",
+          "exit",
+          "globals",
+          "help",
+          "input",
+          "locals",
+          "memoryview",
+          "open",
+          "quit",
+          "setattr",
+          "vars"
+        ],
+        "forbidden_names": [
+          "__builtins__",
+          "__file__",
+          "__import__",
+          "__loader__",
+          "__spec__"
+        ]
+      },
+      "verifier_id": "traceforge.hidden-tests",
+      "verifier_version": "1.0.0"
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}

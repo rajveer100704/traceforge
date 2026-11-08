@@ -1,0 +1,221 @@
+{
+  "bundle_format_version": "1",
+  "checkpoints": [],
+  "configs": {
+    "exp-C-baseline": {
+      "config": {
+        "bootstrap_samples": 2000,
+        "confidence": 0.95,
+        "families": [],
+        "max_tasks_per_family": null,
+        "name": "exp-C-baseline",
+        "provider": {
+          "api_key_env": null,
+          "base_url": null,
+          "kind": "demo",
+          "max_tokens": 1024,
+          "model_id": "demo_provider",
+          "policy": "reference",
+          "prompt_template_version": "agent-v1",
+          "seed": 0,
+          "temperature": 0.0,
+          "timeout_seconds": 60.0
+        },
+        "reward_policy": "verified-v1",
+        "reward_thresholds": [
+          0.1,
+          0.25,
+          0.5,
+          0.75,
+          0.9
+        ],
+        "run_mode": "official",
+        "sandbox": "local",
+        "seed": 0,
+        "seeds": [
+          0,
+          1,
+          2
+        ],
+        "splits": [
+          "public_test",
+          "private_test"
+        ],
+        "training_lineage": {
+          "dataset_version_ids": [],
+          "description": "",
+          "task_ids": [],
+          "training_run_ids": []
+        },
+        "verifier_profile": "v3_full"
+      },
+      "config_hash": "d244945cd3763eb816d8ea01ea3d9f005f2ebf426f8c9cf924e77ef67f929c06"
+    }
+  },
+  "created_at": "2026-11-08T20:25:05.383358+00:00",
+  "datasets": [],
+  "environment": {
+    "cpu_count": 12,
+    "device": {
+      "cuda_available": false,
+      "cuda_version": null,
+      "cudnn_version": null,
+      "device": "cpu",
+      "device_type": "cpu",
+      "gpu_count": 0,
+      "gpu_memory_gb": [],
+      "gpu_names": [],
+      "precision": "fp32",
+      "requested_device": "auto",
+      "requested_precision": "auto",
+      "torch_version": "2.15.0+cpu"
+    },
+    "implementation": "CPython",
+    "machine": "AMD64",
+    "packages": {
+      "accelerate": "1.15.0",
+      "datasets": "5.1.0",
+      "peft": "0.21.2",
+      "torch": "2.15.0",
+      "traceforge": "0.1.0",
+      "transformers": "5.22.2",
+      "trl": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26100-SP0",
+    "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python": "3.12.12"
+  },
+  "episodes": {
+    "count": 45,
+    "file": "episodes.jsonl.gz",
+    "reason": null
+  },
+  "evaluation_ids": [
+    "83b5b012-b895-4f17-b351-2086442a6673"
+  ],
+  "experiment": "C",
+  "files_sha256": {
+    "REPRODUCE.md": "7323cdb4e3bef9e99f2a264aa8db048b05c093cbc668db74c93a9231a2a17782",
+    "episodes.jsonl.gz": "5e235063dcb68fd1068b29da5ebc7e45660b5fbafde89d2cc97ce6ade1fdc325",
+    "metrics.json": "f9e831833e54f0f9ddaa5f37757aebb5500e7b110cb21a1d5220b0ba0b3187d4"
+  },
+  "git": {
+    "branch": "feat/v0.2-research-integrity",
+    "commit": "c5d242b993a4a5aa728ff38304b894f12b5f34fd",
+    "dirty": true,
+    "dirty_files": [
+      "M .github/workflows/container.yml",
+      " M SECURITY.md",
+      " M deployments/docker/Dockerfile",
+      " M docs/benchmark-protocol.md",
+      " M docs/experiment-protocol.md",
+      " M environments/images/sandbox/Dockerfile",
+      " M src/traceforge/application/container.py",
+      " M src/traceforge/application/experiments.py",
+      " M src/traceforge/application/rollouts.py",
+      " M src/traceforge/application/services.py",
+      " M src/traceforge/application/training.py",
+      " M src/traceforge/cli.py",
+      " M src/traceforge/contracts/experiments.py",
+      " M src/traceforge/modules/agents/providers/demo.py",
+      " M src/traceforge/modules/evaluation/contamination.py",
+      " M src/traceforge/modules/evaluation/experiments.py",
+      " M src/traceforge/modules/evaluation/metrics.py",
+      " M src/traceforge/modules/evaluation/reports.py",
+      " M src/traceforge/modules/evaluation/runner.py",
+      " M src/traceforge/modules/evaluation/statistics.py",
+      " M src/traceforge/modules/training/grpo/adapter.py",
+      " M src/traceforge/modules/training/grpo/trainer.py",
+      " M src/traceforge/modules/training/sft/trainer.py"
+    ]
+  },
+  "models": [
+    {
+      "model_id": null,
+      "reason": "no learned model was trained or evaluated"
+    }
+  ],
+  "provenance": {
+    "attack_catalog_version": "1",
+    "dataset_split_policy": {
+      "id": "task-split-or-hash",
+      "version": "1"
+    },
+    "dataset_transformation": {
+      "id": "traceforge.dataset_builder",
+      "version": "1.0.0"
+    },
+    "leakage_checks_version": "2",
+    "n_tasks": 39,
+    "reward_policies": {
+      "self-report-r1": {
+        "policy_hash": "1c453fdd4a7319a49fcc82c7184593ad16b6138f70e24f7962c97ab9f57ea090",
+        "version": "1.0.0"
+      },
+      "verified-v1": {
+        "policy_hash": "34d1e4c5ce337706eca4aefc1327bdf81e721417cf825d5de38e83d6ed6cd371",
+        "version": "1.0.0"
+      },
+      "visible-tests-r2": {
+        "policy_hash": "da4ee2f7dcfa9aa05c712dc7ae5646317aba4c4790952b5b830cdd37ac3726b1",
+        "version": "1.0.0"
+      }
+    },
+    "task_catalogue_hash": "40ba5dc00b4e114e7265228a08c2d17d33e21cc7b93ff6676ee84c50c4eb8ed0",
+    "task_generator_version": "1.0.0",
+    "task_split_policy": {
+      "id": "template-holdout",
+      "version": "1"
+    },
+    "task_version": "1.0.0",
+    "traceforge_version": "0.1.0",
+    "verifier": {
+      "config_hash": "c6d888268ddee0a67144acb85113942dc1c77beb97fd9b1bc67d1ab6ab0b20e4",
+      "hidden_test_module": "test_hidden.py",
+      "static_safety": {
+        "allowed_dunder_attrs": [
+          "__doc__",
+          "__init__",
+          "__name__"
+        ],
+        "always_allowed_imports": [
+          "__future__",
+          "dataclasses",
+          "typing"
+        ],
+        "forbidden_calls": [
+          "__import__",
+          "breakpoint",
+          "compile",
+          "delattr",
+          "eval",
+          "exec",
+          "exit",
+          "globals",
+          "help",
+          "input",
+          "locals",
+          "memoryview",
+          "open",
+          "quit",
+          "setattr",
+          "vars"
+        ],
+        "forbidden_names": [
+          "__builtins__",
+          "__file__",
+          "__import__",
+          "__loader__",
+          "__spec__"
+        ]
+      },
+      "verifier_id": "traceforge.hidden-tests",
+      "verifier_version": "1.0.0"
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}

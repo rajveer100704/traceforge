@@ -13,4 +13,4 @@ SUCCESS (or is unverifiable). A pipeline that trusted claims would train on thes
 | d3_verified_success | 24 | 12 | 12 | 100% | 0 (0%) |
 | d4_verified_plus_informative | 48 | 24 | 24 | 50% | 24 (50%) |
 
-Downstream SFT comparison: **NOT EXECUTED: downstream SFT comparison across D1–D4 requires a real base model; only cpu-test integration is available here (sft mode: available on CPU only (no CUDA); practical only for tiny models)**
+Downstream SFT comparison: **NOT EXECUTED: downstream SFT comparison across D1–D4 requires a real base model; see Experiment F (sft mode: available on CPU only (no CUDA); practical only for tiny models)**

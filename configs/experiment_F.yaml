@@ -1,0 +1,29 @@
+# Experiment F — curation ablation (D1 raw / D2 schema-valid / D3 verified-success /
+# D4 verified-success + informative failures).
+#
+# Controlled across arms: base model + revision, tokenizer (the base model's), training budget,
+# optimiser settings and seeds. Only the dataset differs.
+#
+# As shipped, `training.mode: cpu-test` trains a tiny randomly initialised model to verify the
+# controlled-training pipeline; it is NOT a pretrained model and its losses are not evidence of
+# curation quality. For a real ablation set mode: sft, base_model to a local model directory and
+# base_model_revision to the pinned commit, and give each arm an OpenAI-compatible endpoint that
+# serves that arm's checkpoint (e.g. vLLM with the LoRA adapter). Arms without an endpoint are
+# reported as NOT EXECUTED for evaluation.
+training:
+  mode: cpu-test
+  base_model: tiny-random-local
+  base_model_revision: null
+  max_length: 4096
+  epochs: 1
+  max_steps: 4
+  learning_rate: 0.0005
+  batch_size: 1
+  use_lora: true
+  device: null        # cpu-test default = cpu; set auto|cpu|cuda for real runs
+  precision: auto
+seeds: [0, 1, 2]
+evaluation:
+  splits: [private_test]
+  seeds: [0, 1, 2]
+  providers: {}       # e.g. {d3_verified_success: {kind: openai_compatible, base_url: ..., model_id: ...}}

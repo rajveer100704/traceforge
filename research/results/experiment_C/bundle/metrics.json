@@ -1,0 +1,86 @@
+{
+  "baseline": {
+    "evaluation_id": "83b5b012-b895-4f17-b351-2086442a6673",
+    "n_episodes": 45,
+    "n_tasks": 15,
+    "provider": "demo_provider/reference (scripted)",
+    "report": {
+      "report_json": ".traceforge-exp\\reports\\83b5b012-b895-4f17-b351-2086442a6673\\report.json",
+      "report_md": ".traceforge-exp\\reports\\83b5b012-b895-4f17-b351-2086442a6673\\report.md",
+      "report_md_uri": "local://reports/83b5b012-b895-4f17-b351-2086442a6673/report.md",
+      "report_uri": "local://reports/83b5b012-b895-4f17-b351-2086442a6673/report.json"
+    },
+    "verified_success": {
+      "ci_high": 1.0,
+      "ci_low": 0.9213484012671117,
+      "confidence": 0.95,
+      "method": "wilson",
+      "n": 45,
+      "rate": 1.0,
+      "successes": 45
+    },
+    "verified_success_task_clustered": {
+      "ci_high": 1.0,
+      "ci_low": 1.0,
+      "confidence": 0.95,
+      "estimate": 1.0,
+      "method": "task-cluster percentile bootstrap (pooled ratio)",
+      "n_clusters": 15,
+      "n_observations": 45,
+      "samples": 2000
+    }
+  },
+  "capabilities": {
+    "cuda": false,
+    "cuda_devices": [],
+    "free_disk_gb": 1.2,
+    "modes": {
+      "cpu-test": {
+        "available": true,
+        "reason": "tiny locally-initialised model (no download)"
+      },
+      "demo": {
+        "available": true,
+        "reason": "deterministic scripted provider; no GPU/API required"
+      },
+      "grpo": {
+        "available": true,
+        "reason": "trl 1.17.1, transformers 5.22.2 support environment_factory; no CUDA device \u2014 real GRPO runs are impractical on this machine"
+      },
+      "sft": {
+        "available": true,
+        "reason": "available on CPU only (no CUDA); practical only for tiny models"
+      }
+    },
+    "versions": {
+      "accelerate": "1.15.0",
+      "datasets": "5.1.0",
+      "mlflow-skinny": "3.18.0",
+      "peft": "0.21.2",
+      "torch": "2.15.0",
+      "transformers": "5.22.2",
+      "trl": "1.17.1"
+    }
+  },
+  "evidence": {
+    "kind": "scripted_agent_pipeline_validation",
+    "label": "SCRIPTED-AGENT PIPELINE VALIDATION \u2014 deterministic demo_provider policies, not a learned model. These results test the environment/verifier/reward/statistics pipeline only.",
+    "learned_model_evidence": false,
+    "model_id": "demo_provider",
+    "n_episodes": 45,
+    "n_tasks": 15,
+    "official": true,
+    "policy": "reference",
+    "provider_kind": "demo",
+    "repeated_seed_note": "demo_provider is deterministic: repeated seeds reproduce identical episodes and add no information about variance; n_tasks is the effective sample size.",
+    "seeds": [
+      0,
+      1,
+      2
+    ]
+  },
+  "experiment": "C_base_vs_sft_vs_grpo",
+  "grpo": "NOT EXECUTED: trl 1.17.1, transformers 5.22.2 support environment_factory; no CUDA device \u2014 real GRPO runs are impractical on this machine",
+  "see_also": "Experiment G runs this comparison with model-provider arms when configured.",
+  "sft": "NOT EXECUTED: available on CPU only (no CUDA); practical only for tiny models; no base model weights available locally"
+}

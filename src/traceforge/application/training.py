@@ -13,7 +13,12 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from traceforge.contracts.common import CapabilityUnavailable, JSONValue, NotFoundError
+from traceforge.contracts.common import (
+    CapabilityUnavailable,
+    JSONValue,
+    NotFoundError,
+    ValidationFailure,
+)
 from traceforge.infrastructure.database.repositories import DatasetRepository, ExperimentRepository
 from traceforge.infrastructure.observability import METRICS
 
@@ -86,7 +91,7 @@ class TrainingService:
             if mode == "grpo":
                 return self._grpo(config, experiment_id)
             raise CapabilityUnavailable(f"unknown training mode {mode}")
-        except CapabilityUnavailable as exc:
+        except (CapabilityUnavailable, ValidationFailure) as exc:
             self._record(
                 mode=mode,
                 status="blocked",
@@ -109,6 +114,17 @@ class TrainingService:
         require_ml()
         cfg = SFTConfig.model_validate({**config, "mode": mode})
         train_rows, val_rows, dv = self._dataset_rows(dataset_version_id, config)
+        from traceforge.modules.evaluation.contamination import check_training_rows
+
+        leaks = check_training_rows([*train_rows, *val_rows], self.p.registry)
+        if leaks:
+            raise ValidationFailure(
+                f"training data rejected by leakage guard ({len(leaks)} problem(s)): "
+                + "; ".join(leaks[:10])
+            )
+        training_task_ids = sorted(
+            {str(r.get("task_id")) for r in [*train_rows, *val_rows] if r.get("task_id")}
+        )
         with tempfile.TemporaryDirectory() as tmp:
             cfg = cfg.model_copy(update={"output_dir": str(Path(tmp) / "out")})
             meta = run_sft(cfg, train_rows, val_rows)
@@ -150,6 +166,9 @@ class TrainingService:
             )
         }
         metrics["experiment_tracking"] = tracking
+        metrics["training_task_ids"] = training_task_ids
+        metrics["device"] = meta["device"]
+        metrics["environment"] = meta["environment"]
         with self.p.db.session() as s:
             repo = ExperimentRepository(s)
             tr = repo.create_training_run(
@@ -208,6 +227,9 @@ class TrainingService:
             "rollouts": len(rewards),
             "mean_rollout_reward": sum(rewards) / len(rewards) if rewards else None,
             "seconds": meta["seconds"],
+            "training_task_ids": meta["prompt_task_ids"],
+            "device": meta["device"],
+            "environment": meta["environment"],
         }
         tr = self._record(
             mode="grpo",

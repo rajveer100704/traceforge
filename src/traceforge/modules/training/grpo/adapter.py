@@ -272,3 +272,14 @@ def rl_prompt_rows(
             }
         )
     return rows
+
+
+def assert_training_prompts_only(rows: list[dict[str, Any]], registry: TaskRegistry) -> None:
+    """Fail closed if any GRPO prompt row references a held-out or unknown task."""
+    from traceforge.modules.evaluation.contamination import check_prompt_rows
+
+    problems = check_prompt_rows(rows, registry)
+    if problems:
+        raise CapabilityUnavailable(
+            "GRPO prompt set rejected by leakage guard: " + "; ".join(problems[:10])
+        )

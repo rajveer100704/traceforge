@@ -1,0 +1,1735 @@
+{
+  "experiment": "D_generalization",
+  "evidence": {
+    "kind": "scripted_agent_pipeline_validation",
+    "learned_model_evidence": false,
+    "label": "SCRIPTED-AGENT PIPELINE VALIDATION \u2014 deterministic demo_provider policies, not a learned model. These results test the environment/verifier/reward/statistics pipeline only.",
+    "provider_kind": "demo",
+    "model_id": "demo_provider",
+    "policy": "reference",
+    "official": true,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "repeated_seed_note": "demo_provider is deterministic: repeated seeds reproduce identical episodes and add no information about variance; n_tasks is the effective sample size.",
+    "n_episodes": 63,
+    "n_tasks": 21
+  },
+  "evaluation_id": "acc8d927-a001-4da8-9de8-259635f9ba70",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "by_split": {
+    "private_test": {
+      "n": 27,
+      "verified_success": {
+        "successes": 27,
+        "n": 27,
+        "rate": 1.0,
+        "ci_low": 0.8754449702581331,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 27,
+        "n": 27,
+        "rate": 1.0,
+        "ci_low": 0.8754449702581331,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.96,
+      "mean_reward_ci": [
+        0.96,
+        0.96
+      ],
+      "tool_calls_per_attempt": 8.0,
+      "tool_calls_per_success": 8.0,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.8989289370373525,
+      "environment_compute_seconds": 19.399812300027406,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0007426666666666666,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 27,
+        "n": 27,
+        "rate": 1.0,
+        "ci_low": 0.8754449702581331,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 27,
+      "n_tasks": 9,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.96,
+          "ci_low": 0.9599999999999999,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    },
+    "public_test": {
+      "n": 18,
+      "verified_success": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.9583333333333334,
+      "mean_reward_ci": [
+        0.9572222222222222,
+        0.9594444444444444
+      ],
+      "tool_calls_per_attempt": 8.333333333333334,
+      "tool_calls_per_success": 8.333333333333334,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.9436370611106718,
+      "environment_compute_seconds": 13.421063900037552,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0007882222222222222,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 18,
+      "n_tasks": 6,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.9583333333333334,
+          "ci_low": 0.9566666666666666,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    },
+    "validation": {
+      "n": 18,
+      "verified_success": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.9583333333333334,
+      "mean_reward_ci": [
+        0.9572222222222222,
+        0.9594444444444444
+      ],
+      "tool_calls_per_attempt": 8.333333333333334,
+      "tool_calls_per_success": 8.333333333333334,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.8998094277776545,
+      "environment_compute_seconds": 12.90886890010006,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0008113888888888888,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 18,
+      "n_tasks": 6,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.9583333333333334,
+          "ci_low": 0.9566666666666666,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    }
+  },
+  "by_family": {
+    "access_control": {
+      "n": 21,
+      "verified_success": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.96,
+      "mean_reward_ci": [
+        0.96,
+        0.96
+      ],
+      "tool_calls_per_attempt": 8.0,
+      "tool_calls_per_success": 8.0,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.8885790428570804,
+      "environment_compute_seconds": 14.904033000049822,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0006974285714285714,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 21,
+      "n_tasks": 7,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.96,
+          "ci_low": 0.9599999999999999,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    },
+    "sql_injection": {
+      "n": 21,
+      "verified_success": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.96,
+      "mean_reward_ci": [
+        0.96,
+        0.96
+      ],
+      "tool_calls_per_attempt": 8.0,
+      "tool_calls_per_success": 8.0,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.8767135333331507,
+      "environment_compute_seconds": 14.153951700041944,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0009641428571428572,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 21,
+      "n_tasks": 7,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.96,
+          "ci_low": 0.9599999999999999,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    },
+    "ssrf": {
+      "n": 21,
+      "verified_success": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 21,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.15463901892484688,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.9571428571428571,
+      "mean_reward_ci": [
+        0.9561904761904761,
+        0.958095238095238
+      ],
+      "tool_calls_per_attempt": 8.571428571428571,
+      "tool_calls_per_success": 8.571428571428571,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.970570190476359,
+      "environment_compute_seconds": 16.671760400073254,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0006643809523809523,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 21,
+        "n": 21,
+        "rate": 1.0,
+        "ci_low": 0.8453609810751531,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 21,
+      "n_tasks": 7,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.9571428571428571,
+          "ci_low": 0.9557142857142855,
+          "ci_high": 0.9592857142857141,
+          "n_clusters": 7,
+          "n_observations": 21,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "n": 18,
+      "verified_success": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.9583333333333334,
+      "mean_reward_ci": [
+        0.9572222222222222,
+        0.9594444444444444
+      ],
+      "tool_calls_per_attempt": 8.333333333333334,
+      "tool_calls_per_success": 8.333333333333334,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.9081486999995023,
+      "environment_compute_seconds": 12.850398100046732,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0007992777777777778,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 18,
+      "n_tasks": 6,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.9583333333333334,
+          "ci_low": 0.9566666666666666,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    },
+    "hard": {
+      "n": 27,
+      "verified_success": {
+        "successes": 27,
+        "n": 27,
+        "rate": 1.0,
+        "ci_low": 0.8754449702581331,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 27,
+        "n": 27,
+        "rate": 1.0,
+        "ci_low": 0.8754449702581331,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 27,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.12455502974186705,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.96,
+      "mean_reward_ci": [
+        0.96,
+        0.96
+      ],
+      "tool_calls_per_attempt": 8.0,
+      "tool_calls_per_success": 8.0,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.8989289370373525,
+      "environment_compute_seconds": 19.399812300027406,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0007426666666666666,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 27,
+        "n": 27,
+        "rate": 1.0,
+        "ci_low": 0.8754449702581331,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 27,
+      "n_tasks": 9,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.96,
+          "ci_low": 0.9599999999999999,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 9,
+          "n_observations": 27,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    },
+    "medium": {
+      "n": 18,
+      "verified_success": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "partial_success": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "verifier_error_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "reward_positive_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "false_positive_reward_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "regression_failure_rate": {
+        "successes": 0,
+        "n": 18,
+        "rate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.1758792236466576,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "mean_reward": 0.9583333333333334,
+      "mean_reward_ci": [
+        0.9572222222222222,
+        0.9594444444444444
+      ],
+      "tool_calls_per_attempt": 8.333333333333334,
+      "tool_calls_per_success": 8.333333333333334,
+      "action_rejection_rate": 0.0,
+      "mean_duration_seconds": 0.935297788888824,
+      "environment_compute_seconds": 13.47953470009088,
+      "token_usage": null,
+      "mean_generation_seconds": 0.0008003333333333333,
+      "cost_per_verified_success_usd": null,
+      "hidden_security_pass_rate": {
+        "successes": 18,
+        "n": 18,
+        "rate": 1.0,
+        "ci_low": 0.8241207763533425,
+        "ci_high": 1.0,
+        "confidence": 0.95,
+        "method": "wilson"
+      },
+      "n_episodes": 18,
+      "n_tasks": 6,
+      "episodes_per_task": {
+        "min": 3,
+        "max": 3
+      },
+      "n_seeds": 3,
+      "reward_threshold": 0.5,
+      "task_clustered": {
+        "verified_success": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "false_positive_reward_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "hidden_security_pass_rate": {
+          "estimate": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "regression_failure_rate": {
+          "estimate": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        },
+        "mean_reward": {
+          "estimate": 0.9583333333333334,
+          "ci_low": 0.9566666666666666,
+          "ci_high": 0.9599999999999999,
+          "n_clusters": 6,
+          "n_observations": 18,
+          "confidence": 0.95,
+          "samples": 2000,
+          "method": "task-cluster percentile bootstrap (pooled ratio)"
+        }
+      }
+    }
+  },
+  "task_level": [
+    {
+      "task_id": "authz-t0-s003",
+      "family": "access_control",
+      "template": "t0",
+      "split": "validation",
+      "difficulty": "easy",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "authz-t0-s004",
+      "family": "access_control",
+      "template": "t0",
+      "split": "public_test",
+      "difficulty": "easy",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "authz-t1-s003",
+      "family": "access_control",
+      "template": "t1",
+      "split": "validation",
+      "difficulty": "medium",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "authz-t1-s004",
+      "family": "access_control",
+      "template": "t1",
+      "split": "public_test",
+      "difficulty": "medium",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "authz-t2-s000",
+      "family": "access_control",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "authz-t2-s001",
+      "family": "access_control",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "authz-t2-s002",
+      "family": "access_control",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t0-s003",
+      "family": "sql_injection",
+      "template": "t0",
+      "split": "validation",
+      "difficulty": "easy",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t0-s004",
+      "family": "sql_injection",
+      "template": "t0",
+      "split": "public_test",
+      "difficulty": "easy",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t1-s003",
+      "family": "sql_injection",
+      "template": "t1",
+      "split": "validation",
+      "difficulty": "medium",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t1-s004",
+      "family": "sql_injection",
+      "template": "t1",
+      "split": "public_test",
+      "difficulty": "medium",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t2-s000",
+      "family": "sql_injection",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t2-s001",
+      "family": "sql_injection",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "sqli-t2-s002",
+      "family": "sql_injection",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t0-s003",
+      "family": "ssrf",
+      "template": "t0",
+      "split": "validation",
+      "difficulty": "easy",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.955,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t0-s004",
+      "family": "ssrf",
+      "template": "t0",
+      "split": "public_test",
+      "difficulty": "easy",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.955,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t1-s003",
+      "family": "ssrf",
+      "template": "t1",
+      "split": "validation",
+      "difficulty": "medium",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.955,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t1-s004",
+      "family": "ssrf",
+      "template": "t1",
+      "split": "public_test",
+      "difficulty": "medium",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.955,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t2-s000",
+      "family": "ssrf",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t2-s001",
+      "family": "ssrf",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    },
+    {
+      "task_id": "ssrf-t2-s002",
+      "family": "ssrf",
+      "template": "t2",
+      "split": "private_test",
+      "difficulty": "hard",
+      "n_episodes": 3,
+      "seeds": [
+        "0",
+        "1",
+        "2"
+      ],
+      "verified_success_rate": 1.0,
+      "mean_reward": 0.96,
+      "verdicts": {
+        "PASS": 3
+      },
+      "outcome_consistent_across_episodes": true
+    }
+  ],
+  "leakage": {
+    "ok": true,
+    "checks_version": "2",
+    "checks": [
+      "split_fixture_disjoint",
+      "private_template_holdout",
+      "task_lineage",
+      "training_overlap"
+    ],
+    "problems": [],
+    "training_overlap": [],
+    "task_counts_by_split": {
+      "private_test": 9,
+      "public_test": 6,
+      "train": 18,
+      "validation": 6
+    },
+    "training_sources": [],
+    "training_task_ids": [],
+    "unlinked_training_task_ids": [],
+    "evaluated_task_ids": [
+      "authz-t0-s003",
+      "authz-t0-s004",
+      "authz-t1-s003",
+      "authz-t1-s004",
+      "authz-t2-s000",
+      "authz-t2-s001",
+      "authz-t2-s002",
+      "sqli-t0-s003",
+      "sqli-t0-s004",
+      "sqli-t1-s003",
+      "sqli-t1-s004",
+      "sqli-t2-s000",
+      "sqli-t2-s001",
+      "sqli-t2-s002",
+      "ssrf-t0-s003",
+      "ssrf-t0-s004",
+      "ssrf-t1-s003",
+      "ssrf-t1-s004",
+      "ssrf-t2-s000",
+      "ssrf-t2-s001",
+      "ssrf-t2-s002"
+    ]
+  },
+  "report": {
+    "report_json": ".traceforge-exp\\reports\\acc8d927-a001-4da8-9de8-259635f9ba70\\report.json",
+    "report_md": ".traceforge-exp\\reports\\acc8d927-a001-4da8-9de8-259635f9ba70\\report.md",
+    "report_uri": "local://reports/acc8d927-a001-4da8-9de8-259635f9ba70/report.json",
+    "report_md_uri": "local://reports/acc8d927-a001-4da8-9de8-259635f9ba70/report.md"
+  },
+  "interpretation": "demo_provider is scripted; held-out results validate the protocol, not learned generalisation. Re-run with a model provider for real measurements."
+}

@@ -2,29 +2,63 @@ name: Containers
 on:
   push: {branches: [main]}
   pull_request:
+  schedule:
+    - cron: "17 5 * * 1"  # weekly re-scan: new CVEs appear without code changes
 permissions: {contents: read}
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      TRIVY_VERSION: v0.70.0
     steps:
       - uses: actions/checkout@v4
-      - name: Build platform image
-        run: docker build -f deployments/docker/Dockerfile -t traceforge:ci .
-      - name: Build sandbox image
-        run: docker build -t traceforge-sandbox:0.1 environments/images/sandbox
-      - name: Images run as non-root
-        run: |
-          test "$(docker run --rm traceforge:ci id -u)" != "0"
-          test "$(docker run --rm traceforge-sandbox:0.1 id -u)" != "0"
       - name: Base images pinned by digest
         run: |
           grep -E '^FROM .+@sha256:[0-9a-f]{64}' environments/images/sandbox/Dockerfile
           grep -cE '^FROM .+@sha256:[0-9a-f]{64}' deployments/docker/Dockerfile | grep -q 2
+      - name: Build platform image
+        run: docker build -f deployments/docker/Dockerfile -t traceforge:ci .
+      - name: Build sandbox image
+        run: docker build -t traceforge-sandbox:0.1 environments/images/sandbox
+      - name: Images run as non-root and carry no setuid/setgid binaries
+        run: |
+          for img in traceforge:ci traceforge-sandbox:0.1; do
+            uid="$(docker run --rm "$img" id -u)"
+            echo "$img uid=$uid"; test "$uid" != "0"
+            suid="$(docker run --rm "$img" sh -c 'find / -xdev -perm /6000 -type f 2>/dev/null' || true)"
+            if [ -n "$suid" ]; then echo "setuid/setgid binaries in $img:"; echo "$suid"; exit 1; fi
+          done
       - name: Docker sandbox integration tests
         run: |
           curl -LsSf https://astral.sh/uv/0.10.7/install.sh | sh
           ~/.local/bin/uv sync --frozen
           ~/.local/bin/uv run pytest -q -m docker tests/integration/test_training_and_docker.py
-      - name: Image vulnerability scan
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with: {image-ref: "traceforge:ci", severity: "CRITICAL,HIGH", exit-code: "0", format: table}
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
+        with: {version: "${{ env.TRIVY_VERSION }}", cache: true}
+      - name: Scan both images (machine-readable, all severities)
+        run: |
+          mkdir -p reports
+          for img in traceforge:ci traceforge-sandbox:0.1; do
+            name="$(echo "$img" | tr ':/' '__')"
+            trivy image --scanners vuln --timeout 15m --format json --output "reports/$name.trivy.json" "$img"
+            trivy convert --format table --severity CRITICAL,HIGH "reports/$name.trivy.json" | tee "reports/$name.table.txt"
+            trivy convert --format sarif --output "reports/$name.sarif" "reports/$name.trivy.json"
+          done
+      - name: Vulnerability gate (CRITICAL/HIGH fail unless a valid time-bounded exception applies)
+        run: |
+          ~/.local/bin/uv run python scripts/trivy_gate.py \
+            --exceptions security/vulnerability-exceptions.yaml \
+            --report traceforge:ci=reports/traceforge_ci.trivy.json \
+            --report traceforge-sandbox:0.1=reports/traceforge-sandbox_0.1.trivy.json \
+            --summary reports/gate-summary.md --result reports/gate-result.json
+      - name: Publish gate summary
+        if: always()
+        run: test -f reports/gate-summary.md && cat reports/gate-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload vulnerability reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: reports/
+          retention-days: 30

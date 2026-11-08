@@ -1,0 +1,79 @@
+{
+  "accepted": 77,
+  "downstream_sft": "NOT EXECUTED: downstream SFT comparison across D1\u2013D4 requires a real base model; see Experiment F (sft mode: available on CPU only (no CUDA); practical only for tiny models)",
+  "evidence": {
+    "kind": "scripted_agent_pipeline_validation",
+    "label": "SCRIPTED-AGENT PIPELINE VALIDATION \u2014 deterministic demo_provider policies with ground-truth labels by construction; not evidence about any learned model.",
+    "learned_model_evidence": false
+  },
+  "experiment": "A_trajectory_quality",
+  "levels": {
+    "d1_raw": {
+      "dataset_version": "v-9e0b0c435561",
+      "misleading_claimed_success": 51,
+      "misleading_fraction": 0.6296296296296297,
+      "rejection_summary": {},
+      "rows_by_split": {
+        "train": 45,
+        "validation": 36
+      },
+      "selected": 81,
+      "verified_success_fraction": 0.30864197530864196
+    },
+    "d2_schema_valid": {
+      "dataset_version": "v-1fcc6488a51c",
+      "misleading_claimed_success": 50,
+      "misleading_fraction": 0.6493506493506493,
+      "rejection_summary": {
+        "excluded_by_d2_schema_valid:duplicate": 1,
+        "excluded_by_d2_schema_valid:rejected": 3
+      },
+      "rows_by_split": {
+        "train": 41,
+        "validation": 36
+      },
+      "selected": 77,
+      "verified_success_fraction": 0.3116883116883117
+    },
+    "d3_verified_success": {
+      "dataset_version": "v-a0fffb159d79",
+      "misleading_claimed_success": 0,
+      "misleading_fraction": 0.0,
+      "rejection_summary": {
+        "excluded_by_d3_verified_success:accepted": 53,
+        "excluded_by_d3_verified_success:duplicate": 1,
+        "excluded_by_d3_verified_success:rejected": 3
+      },
+      "rows_by_split": {
+        "train": 12,
+        "validation": 12
+      },
+      "selected": 24,
+      "verified_success_fraction": 1.0
+    },
+    "d4_verified_plus_informative": {
+      "dataset_version": "v-8ce75ca9058f",
+      "misleading_claimed_success": 24,
+      "misleading_fraction": 0.5,
+      "rejection_summary": {
+        "excluded_by_d4_verified_plus_informative:accepted": 29,
+        "excluded_by_d4_verified_plus_informative:duplicate": 1,
+        "excluded_by_d4_verified_plus_informative:rejected": 3
+      },
+      "rows_by_split": {
+        "train": 24,
+        "validation": 24
+      },
+      "selected": 48,
+      "verified_success_fraction": 0.5
+    }
+  },
+  "n_imported_example_records": 9,
+  "n_trajectories": 81,
+  "n_verified_rollouts": 72,
+  "quality_status_counts": {
+    "accepted": 77,
+    "duplicate": 1,
+    "rejected": 3
+  }
+}

@@ -11,10 +11,11 @@ sandboxes through an allow-listed tool interface, **independently verifies** out
 tests, computes versioned rewards *only* from verification evidence, measures reward hacking, and
 evaluates on task-family-held-out splits with honest uncertainty.
 
-> **Status:** v0.1, local research release. Core lifecycle, API, CLI, verification, reward-hacking
-> experiments and cpu-test training are implemented and tested. Real SFT/GRPO runs and the Docker
-> sandbox integration were **not executed** in the development environment (no GPU, no Docker daemon).
-> See [IMPLEMENTATION_STATUS](docs/IMPLEMENTATION_STATUS.md).
+> **Status:** v0.2 (research-integrity hardening). Core lifecycle, API, CLI, verification,
+> reward-hacking experiments (known and held-out attacks), fail-closed benchmark integrity,
+> task-clustered statistics, reproducibility bundles and cpu-test training are implemented and
+> tested. Real SFT/GRPO runs were **not executed** (no GPU, no model weights). See
+> [IMPLEMENTATION_STATUS](docs/IMPLEMENTATION_STATUS.md) and [CHANGELOG](CHANGELOG.md).
 
 ## What is in the box
 
@@ -75,19 +76,26 @@ traceforge reward recompute <verification-id> --policy verified-v1
 traceforge benchmark run --config configs/benchmark.yaml
 traceforge train sft --config configs/training_sft.yaml [--dataset-version-id ID]
 traceforge train grpo --config configs/training_grpo.yaml
-traceforge experiment run A|B|C|D|E
+traceforge experiment run A|B|C|D|E|F|G|H [--seeds 0,1,2] [--config FILE]
 ```
 
-## Measured results (deterministic demo provider; validates the pipeline, not a model)
+## Measured results (scripted demo provider; validates the pipeline, not a model)
 
-From [research/results](research/results) — see the [technical report](research/TRACEFORGE_TECHNICAL_REPORT.md):
+From [research/results](research/results), 9 independent tasks × 3 seeds — see the
+[technical report](research/TRACEFORGE_TECHNICAL_REPORT.md):
 
-- **Reward hacking (Experiment B, 108 episodes, 9 tasks):** false-positive reward rate on undeserving
-  episodes — R1 self-report **90.0 %** [82.1, 94.6], R2 visible tests **38.9 %** [29.5, 49.2],
-  R3 TraceForge verifier **0.0 %** [0.0, 4.1] (n = 90); all designs rewarded 100 % of genuine fixes (n = 18).
+- **Known attacks (Experiment B, 324 episodes):** false-positive reward rate on undeserving
+  episodes — R1 self-report **90.0 %**, R2 visible tests **38.9 %** (task-clustered CI 26.7–55.6 %),
+  R3 TraceForge **0.0 %** (n = 270); all designs rewarded 100 % of genuine fixes. These attacks were
+  known when R3 was designed.
+- **Held-out attacks (Experiment H, written after verifier 1.0.0 froze):** R3 false-positive reward
+  rate **4.4 %** (6/135; task-clustered CI 0–11.1 %). The `universal_equality` attack (an
+  always-equal return object) passes R3 on two SQL-injection templates — a real, unpatched
+  verifier 1.0.0 weakness, documented rather than silently fixed.
 - **Verifier robustness (Experiment E):** 108/108 constructed fault and tampering cases behaved as specified.
 
-No trained-model results are reported because no model training beyond the cpu-test integration was executed.
+No trained-model results are reported: Experiments F and G executed only pipeline checks
+(cpu-test training, scripted arm); their model arms are marked NOT EXECUTED.
 
 ## Configuration
 

@@ -1,0 +1,517 @@
+{
+  "arms": {
+    "d1_raw": {
+      "control_hash": "7da247f23ab82bf94561f679f34a2097e68ed9538b3ad6a0a68aaaedab4fd3c5",
+      "dataset": {
+        "content_hash": "410266e263deccbb07f5fd2065d8208d8526450eba3a863d4d77eaf1be0f841e",
+        "dataset_version": "v-410266e263de",
+        "level": "d1_raw",
+        "rows_by_split": {
+          "train": 45,
+          "validation": 36
+        }
+      },
+      "evaluation": {
+        "reason": "training used cpu-test (tiny random model, not pretrained); evaluating it would measure nothing",
+        "status": "NOT EXECUTED"
+      },
+      "leakage_problems": [],
+      "training": [
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "a40dfe89048a5842b70d43fdc59ef9013be5a057d1ae6730f02733a221f255ea",
+          "config_hash": "b8c5ab300bcfde325d119cbb25c47d8d47b99e54ec9eee402cd24cac235b19c7",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.526368141174316,
+          "last_loss": 5.245090484619141,
+          "mode": "cpu-test",
+          "seconds": 15.231647300002805,
+          "seed": 0,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 45,
+          "validation_examples": 36,
+          "validation_loss": 5.169134934743245
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "cca9dfc6b9a10055ae34c4d455c2bbd3d35e73dcf256f9525dfc177b7dd442f0",
+          "config_hash": "2d57da3642120204572d598a086970ed2880492c85923f14c7722180a09a21a6",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.555232048034668,
+          "last_loss": 5.180606842041016,
+          "mode": "cpu-test",
+          "seconds": 16.55954809999821,
+          "seed": 1,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 45,
+          "validation_examples": 36,
+          "validation_loss": 5.122711963123745
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "f878523657f8163f9e8962367b04da02ae4be4683e28257655ea74f290c08368",
+          "config_hash": "a3b73446997fa28e25fc379bda50695fbb6293e7d5090bde13cc47727311b98b",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.562483787536621,
+          "last_loss": 5.252146244049072,
+          "mode": "cpu-test",
+          "seconds": 11.07312169999932,
+          "seed": 2,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 45,
+          "validation_examples": 36,
+          "validation_loss": 5.152002930641174
+        }
+      ]
+    },
+    "d2_schema_valid": {
+      "control_hash": "7da247f23ab82bf94561f679f34a2097e68ed9538b3ad6a0a68aaaedab4fd3c5",
+      "dataset": {
+        "content_hash": "6de0a285bdccd4d87e000093a5420d148b1b5e5cdb1dbc3b4abbd44fffdcbf1d",
+        "dataset_version": "v-6de0a285bdcc",
+        "level": "d2_schema_valid",
+        "rows_by_split": {
+          "train": 41,
+          "validation": 36
+        }
+      },
+      "evaluation": {
+        "reason": "training used cpu-test (tiny random model, not pretrained); evaluating it would measure nothing",
+        "status": "NOT EXECUTED"
+      },
+      "leakage_problems": [],
+      "training": [
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "7aeb8f5d91dfa24840065f8ed76ba8b9f9e8a165bd6158993e9e5b6147be01a6",
+          "config_hash": "10cf55931e342c1805f801b2a236da5e277a83d95a4c5b14ae22ea90b644aa5b",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.546532154083252,
+          "last_loss": 5.252575874328613,
+          "mode": "cpu-test",
+          "seconds": 13.637573299994983,
+          "seed": 0,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 41,
+          "validation_examples": 36,
+          "validation_loss": 5.159336699379815
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "ab922aa43e357cd6ab03c242588ee02fee4b026fc6b7726696dd6aa987d15597",
+          "config_hash": "b976325673980a01d3af5c87598220a53441392cfb7de9f893ffce33b73132ed",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.532533645629883,
+          "last_loss": 5.288533687591553,
+          "mode": "cpu-test",
+          "seconds": 12.494744600000558,
+          "seed": 1,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 41,
+          "validation_examples": 36,
+          "validation_loss": 5.145209179984199
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "b3c354ee747a51ba1a4e3a513803550aa916f25e9fb026346e88d26520abc73c",
+          "config_hash": "5d3cd307df0b0a962205b93902a64cc3705182d88db118169ac06bf35ab7179d",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.560828685760498,
+          "last_loss": 5.224431037902832,
+          "mode": "cpu-test",
+          "seconds": 15.718528500001412,
+          "seed": 2,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 41,
+          "validation_examples": 36,
+          "validation_loss": 5.143243696954515
+        }
+      ]
+    },
+    "d3_verified_success": {
+      "control_hash": "7da247f23ab82bf94561f679f34a2097e68ed9538b3ad6a0a68aaaedab4fd3c5",
+      "dataset": {
+        "content_hash": "999f7f7c9c6f5014e018ea15c24881ce0e5abb742e94cdd6fd2bca05ac6e3d09",
+        "dataset_version": "v-999f7f7c9c6f",
+        "level": "d3_verified_success",
+        "rows_by_split": {
+          "train": 12,
+          "validation": 12
+        }
+      },
+      "evaluation": {
+        "reason": "training used cpu-test (tiny random model, not pretrained); evaluating it would measure nothing",
+        "status": "NOT EXECUTED"
+      },
+      "leakage_problems": [],
+      "training": [
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "044b6db1bd2a52cced0ecb88fbb0803abcc827acdecde5d499c8bea638de6580",
+          "config_hash": "2dc747c1c5470ec016dd0949ec5b1826e587cd166c762032fac9e94e99f88b67",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.526368141174316,
+          "last_loss": 5.237102031707764,
+          "mode": "cpu-test",
+          "seconds": 13.730583700002171,
+          "seed": 0,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 12,
+          "validation_examples": 12,
+          "validation_loss": 5.165179808934529
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "5227aac9aab54305b161d8c6c60ca853dcc90f5561d2ef3288408c07683ea48b",
+          "config_hash": "bc2d75d3f5ede8bae6466bb1934c1f82d18148e3975e3f4213169dc643c9db82",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.5389723777771,
+          "last_loss": 5.203190326690674,
+          "mode": "cpu-test",
+          "seconds": 13.95858600000065,
+          "seed": 1,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 12,
+          "validation_examples": 12,
+          "validation_loss": 5.125255823135376
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "38e2f1d190a53fb2c60b75757fd73d61d7a24c0febd0d78a58f169c6db3d69b0",
+          "config_hash": "de9891df10e94919f47dc8f0a57f91d30a2b37e2d981296389f295bf9db413e2",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.551797389984131,
+          "last_loss": 5.249171257019043,
+          "mode": "cpu-test",
+          "seconds": 13.675356799998553,
+          "seed": 2,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 12,
+          "validation_examples": 12,
+          "validation_loss": 5.139548858006795
+        }
+      ]
+    },
+    "d4_verified_plus_informative": {
+      "control_hash": "7da247f23ab82bf94561f679f34a2097e68ed9538b3ad6a0a68aaaedab4fd3c5",
+      "dataset": {
+        "content_hash": "7e0c8388e04b5712dc2910bccdcbb0e7617c79ce3e343f5af41af42de7c1109b",
+        "dataset_version": "v-7e0c8388e04b",
+        "level": "d4_verified_plus_informative",
+        "rows_by_split": {
+          "train": 24,
+          "validation": 24
+        }
+      },
+      "evaluation": {
+        "reason": "training used cpu-test (tiny random model, not pretrained); evaluating it would measure nothing",
+        "status": "NOT EXECUTED"
+      },
+      "leakage_problems": [],
+      "training": [
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "61624b2bcaf36f76aef09264d0526c95ed8bdc20906fe58f2ef12f7c8aa89f63",
+          "config_hash": "04c727439379a46a3d4338e214331c75e1629c4f54f7796e47f532b5311cd995",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.5285258293151855,
+          "last_loss": 5.25909948348999,
+          "mode": "cpu-test",
+          "seconds": 14.919117299999925,
+          "seed": 0,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 24,
+          "validation_examples": 24,
+          "validation_loss": 5.160772820313771
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "1264df0709675ec7b69f7256ff67fb8459aac34d8155896f9a67d9991baec9d3",
+          "config_hash": "129840e4e22cc42f8830b03645e6c54ff2924946e71185e970efd4f905973865",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.541601657867432,
+          "last_loss": 5.192555904388428,
+          "mode": "cpu-test",
+          "seconds": 14.804286800004775,
+          "seed": 1,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 24,
+          "validation_examples": 24,
+          "validation_loss": 5.120378613471985
+        },
+        {
+          "base_model": "tiny-random-local",
+          "base_model_revision": null,
+          "checkpoint_sha256": "c7a625551ed7b47e96c401dee843695f50a06b105e89cae5937c82f50ed48436",
+          "config_hash": "31ed21970594b50cc6e84fdb6f27a593c6c9e712cdacb2b2c04721774edd69a5",
+          "device": {
+            "cuda_available": false,
+            "cuda_version": null,
+            "cudnn_version": null,
+            "device": "cpu",
+            "device_type": "cpu",
+            "gpu_count": 0,
+            "gpu_memory_gb": [],
+            "gpu_names": [],
+            "precision": "fp32",
+            "requested_device": "cpu",
+            "requested_precision": "auto",
+            "torch_version": "2.15.0+cpu"
+          },
+          "dropped_no_target": {
+            "train": 0,
+            "validation": 0
+          },
+          "first_loss": 5.565640449523926,
+          "last_loss": 5.2192840576171875,
+          "mode": "cpu-test",
+          "seconds": 15.549086400002125,
+          "seed": 2,
+          "status": "EXECUTED",
+          "steps": 4,
+          "train_examples": 24,
+          "validation_examples": 24,
+          "validation_loss": 5.147473931312561
+        }
+      ]
+    }
+  },
+  "control_hash": "7da247f23ab82bf94561f679f34a2097e68ed9538b3ad6a0a68aaaedab4fd3c5",
+  "controlled": {
+    "base_model": "tiny-random-local",
+    "base_model_revision": null,
+    "batch_size": 1,
+    "device": null,
+    "epochs": 1,
+    "learning_rate": 0.0005,
+    "max_length": 4096,
+    "max_steps": 4,
+    "mode": "cpu-test",
+    "precision": "auto",
+    "use_lora": true
+  },
+  "evaluation_splits": [
+    "private_test"
+  ],
+  "evidence": {
+    "kind": "pipeline_validation",
+    "label": "CONTROLLED-TRAINING PIPELINE CHECK ONLY \u2014 cpu-test trains a tiny randomly initialised model; losses are not evidence about curation quality.",
+    "learned_model_evidence": false
+  },
+  "experiment": "F_curation_ablation",
+  "model_improvement_claim": "NONE \u2014 no pretrained model was trained and evaluated",
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}

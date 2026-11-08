@@ -51,3 +51,56 @@ def proportion(successes: int, n: int, confidence: float = 0.95) -> dict[str, An
         "confidence": confidence,
         "method": "wilson",
     }
+
+
+CLUSTER_METHOD = "task-cluster percentile bootstrap (pooled ratio)"
+
+
+def cluster_bootstrap(
+    clusters: list[list[float]],
+    *,
+    samples: int = 2000,
+    confidence: float = 0.95,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Cluster (task-level) bootstrap CI for a pooled mean of per-episode values.
+
+    Episodes of the same task are not independent (same fixture, same hidden tests, and for a
+    deterministic provider identical outcomes across seeds). Resampling whole tasks with
+    replacement gives an interval whose width reflects the number of *independent tasks*, not the
+    number of episodes. The estimate is the pooled ratio sum(values) / count over all episodes,
+    which equals the episode-level proportion. Deterministic for a fixed seed.
+
+    With fewer than two clusters the interval is undefined and reported as None.
+    """
+    clusters = [c for c in clusters if c]
+    n_obs = sum(len(c) for c in clusters)
+    base: dict[str, Any] = {
+        "estimate": (sum(sum(c) for c in clusters) / n_obs) if n_obs else None,
+        "ci_low": None,
+        "ci_high": None,
+        "n_clusters": len(clusters),
+        "n_observations": n_obs,
+        "confidence": confidence,
+        "samples": samples,
+        "method": CLUSTER_METHOD,
+    }
+    if len(clusters) < 2:
+        base["note"] = "fewer than 2 independent tasks: cluster interval undefined"
+        return base
+    rng = random.Random(seed)  # noqa: S311 - statistical resampling, not security
+    sums = [(sum(c), len(c)) for c in clusters]
+    k = len(sums)
+    stats = []
+    for _ in range(samples):
+        tot = cnt = 0.0
+        for _j in range(k):
+            s, n = sums[rng.randrange(k)]
+            tot += s
+            cnt += n
+        stats.append(tot / cnt)
+    stats.sort()
+    lo_idx = int(((1 - confidence) / 2) * samples)
+    hi_idx = min(samples - 1, int((1 - (1 - confidence) / 2) * samples) - 1)
+    base["ci_low"], base["ci_high"] = stats[lo_idx], stats[hi_idx]
+    return base

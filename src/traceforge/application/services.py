@@ -7,7 +7,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
@@ -35,8 +35,13 @@ from traceforge.infrastructure.database.repositories import (
 from traceforge.infrastructure.database.session import Database
 from traceforge.infrastructure.storage import content_key, key_from_uri
 from traceforge.modules.agents.runner import CancelToken
+from traceforge.modules.evaluation.contamination import LeakageReport
 from traceforge.modules.evaluation.reports import benchmark_document, benchmark_markdown
-from traceforge.modules.evaluation.runner import BenchmarkResult, BenchmarkRunner
+from traceforge.modules.evaluation.runner import (
+    BenchmarkIntegrityError,
+    BenchmarkResult,
+    BenchmarkRunner,
+)
 from traceforge.modules.rewards.engine import RewardEngine
 from traceforge.modules.rewards.policies import PolicyRegistry
 from traceforge.modules.tasks.registry import TaskRegistry
@@ -45,7 +50,11 @@ from traceforge.modules.trace_processing.ingestion import IngestionPipeline, spl
 from traceforge.modules.trace_processing.quality import QualityEngine, build_report
 from traceforge.modules.trace_processing.validators import default_validators
 
+from .lineage import ResolvedLineage, resolve_lineage
 from .rollouts import RolloutArtifacts, RolloutExecutor
+
+if TYPE_CHECKING:
+    from .container import Platform
 
 log = logging.getLogger(__name__)
 
@@ -428,9 +437,11 @@ class EvaluationService:
         runner: BenchmarkRunner,
         rollouts: RolloutService,
         reports_dir: Path,
+        platform: Platform | None = None,
     ) -> None:
         self.db, self.artifacts, self.runner, self.rollouts = db, artifacts, runner, rollouts
         self.reports_dir = reports_dir
+        self.platform = platform
 
     async def run(
         self,
@@ -444,6 +455,22 @@ class EvaluationService:
             eval_id = ExperimentRepository(s).create_evaluation(
                 config.name, config.model_dump(mode="json"), config.config_hash, experiment_id
             )
+        lineage = (
+            resolve_lineage(self.platform, config.training_lineage)
+            if self.platform is not None and config.training_lineage.declared
+            else ResolvedLineage(task_ids=set(config.training_lineage.task_ids))
+        )
+        leakage = self.runner.validate(
+            config,
+            training_task_ids=lineage.task_ids,
+            training_sources=lineage.sources,
+            lineage_problems=lineage.problems,
+        )
+        try:
+            self.runner.enforce(config, leakage)
+        except BenchmarkIntegrityError:
+            self._persist_refusal(eval_id, config, leakage)
+            raise
 
         def on_result(art: RolloutArtifacts) -> None:
             self.rollouts.persist(art, config.reward_policy, evaluation_run_id=eval_id)
@@ -451,7 +478,12 @@ class EvaluationService:
                 ExperimentRepository(s).add_result(eval_id, art.summary)
 
         result = await self.runner.run(
-            config, on_result=on_result, progress=progress, cancel=cancel, benchmark_id=eval_id
+            config,
+            on_result=on_result,
+            progress=progress,
+            cancel=cancel,
+            benchmark_id=eval_id,
+            leakage=leakage,
         )
         doc = benchmark_document(result, {"evaluation_run_id": str(eval_id)})
         md = benchmark_markdown(doc)
@@ -470,7 +502,15 @@ class EvaluationService:
         with self.db.session() as s:
             ExperimentRepository(s).finish_evaluation(
                 eval_id,
-                {k: v for k, v in result.metrics.items() if k != "per_task"},
+                {
+                    **{
+                        k: v
+                        for k, v in result.metrics.items()
+                        if k not in ("per_task", "task_level")
+                    },
+                    "leakage": result.leakage.as_dict(),
+                    "run_mode": config.run_mode,
+                },
                 report_id,
                 status,
             )
@@ -481,6 +521,31 @@ class EvaluationService:
             "report_md_uri": md_uri,
         }
         return result, paths
+
+    def _persist_refusal(
+        self, eval_id: uuid.UUID, config: BenchmarkConfig, leakage: LeakageReport
+    ) -> None:
+        doc = {
+            "report_type": "benchmark_refusal",
+            "benchmark_id": str(eval_id),
+            "config": config.model_dump(mode="json"),
+            "config_hash": config.config_hash,
+            "run_mode": config.run_mode,
+            "status": "refused",
+            "reason": "leakage/lineage validation failed for an official run",
+            "leakage": leakage.as_dict(),
+        }
+        data = json.dumps(doc, indent=2, default=str).encode()
+        report_id, _ = self.artifacts.put(
+            f"reports/{eval_id}/refusal.json", data, "benchmark_report", "application/json"
+        )
+        out_dir = self.reports_dir / str(eval_id)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "refusal.json").write_bytes(data)
+        with self.db.session() as s:
+            ExperimentRepository(s).finish_evaluation(
+                eval_id, {"leakage": leakage.as_dict(), "refused": True}, report_id, "refused"
+            )
 
     def get(self, evaluation_id: uuid.UUID) -> dict[str, Any]:
         with self.db.session() as s:

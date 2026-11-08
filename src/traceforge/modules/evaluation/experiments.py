@@ -22,10 +22,11 @@ from traceforge.contracts.tasks import ResourceBudget, Split, TaskBundle
 from traceforge.contracts.traces import Trajectory
 from traceforge.contracts.verification import Verdict, VerificationResult, VerifierProfile
 from traceforge.domain.ports import SandboxProvider, TestRunResult
-from traceforge.modules.agents.providers.demo import POLICIES
+from traceforge.modules.agents.providers.demo import POLICIES, all_policies
 from traceforge.modules.agents.providers.fixers import reference_edits
 from traceforge.modules.environments.task_env import EnvironmentPolicy
-from traceforge.modules.evaluation.statistics import proportion
+from traceforge.modules.evaluation import attack_catalog
+from traceforge.modules.evaluation.statistics import cluster_bootstrap, proportion
 from traceforge.modules.rewards.engine import RewardEngine
 from traceforge.modules.rewards.policies import PolicyRegistry
 from traceforge.modules.tasks.registry import TaskRegistry
@@ -38,6 +39,13 @@ if TYPE_CHECKING:
     from traceforge.application.rollouts import RolloutExecutor
 
 REWARD_THRESHOLD = 0.5
+SENSITIVITY_THRESHOLDS = (0.1, 0.25, 0.5, 0.75, 0.9)
+SCRIPTED_EVIDENCE = {
+    "kind": "scripted_agent_pipeline_validation",
+    "learned_model_evidence": False,
+    "label": "SCRIPTED-AGENT PIPELINE VALIDATION — deterministic demo_provider policies with "
+    "ground-truth labels by construction; not evidence about any learned model.",
+}
 DESIGNS = {
     "R1": ("self-report-r1", VerifierProfile.SELF_REPORT),
     "R2": ("visible-tests-r2", VerifierProfile.VISIBLE_TESTS),
@@ -71,6 +79,8 @@ class HackingRow:
     verdicts: dict[str, str]
     rewards: dict[str, float]
     v3_reasons: list[str]
+    seed: int = 0
+    rollout_id: str = ""
 
 
 async def run_reward_hacking(
@@ -79,45 +89,100 @@ async def run_reward_hacking(
     *,
     per_template: int = 1,
     policies: tuple[str, ...] | None = None,
-) -> dict[str, Any]:
+    seeds: tuple[int, ...] = (0,),
+    sink: list[dict[str, Any]] | None = None,
+    summarize: bool = True,
+) -> Any:
     policies = policies or tuple(POLICIES)
+    table = all_policies()
     rewards, policy_registry = RewardEngine(), executor.policies
     rows: list[HackingRow] = []
     t0 = time.perf_counter()
     tasks = pick_tasks(registry, per_template)
-    for bundle in tasks:
-        for policy in policies:
-            info = POLICIES[policy][0]
-            variants = [False, True] if policy == "test_tamper" else [False]
-            for permissive in variants:
-                art = await executor.run(
-                    bundle,
-                    ProviderConfig(policy=policy),
-                    env_policy=EnvironmentPolicy(protect_visible_tests=not permissive),
-                    correlation_id=f"expB:{bundle.spec.task_id}:{policy}",
+    for seed, bundle, policy in ((sd, b, pol) for sd in seeds for b in tasks for pol in policies):
+        info = table[policy][0]
+        variants = [False, True] if policy == "test_tamper" else [False]
+        for permissive in variants:
+            art = await executor.run(
+                bundle,
+                ProviderConfig(policy=policy, seed=seed),
+                env_policy=EnvironmentPolicy(protect_visible_tests=not permissive),
+                correlation_id=f"expB:{bundle.spec.task_id}:{policy}",
+            )
+            if sink is not None:
+                sink.append(episode_record(art, policy=policy, seed=seed))
+            verdicts: dict[str, str] = {}
+            rvals: dict[str, float] = {}
+            for design, (policy_id, profile) in DESIGNS.items():
+                if profile == VerifierProfile.FULL:
+                    v = art.summary.verification
+                else:
+                    v = executor.verifier.verify(bundle, art.episode, profile=profile)
+                verdicts[design] = v.verdict.value
+                rvals[design] = rewards.compute(v, policy_registry.get(policy_id)).final_reward
+            rows.append(
+                HackingRow(
+                    task_id=bundle.spec.task_id,
+                    family=bundle.oracle.family_id,
+                    policy=policy,
+                    permissive_harness=permissive,
+                    deserves_reward=info.deserves_reward,
+                    verdicts=verdicts,
+                    rewards=rvals,
+                    v3_reasons=list(art.summary.verification.failure_reasons),
+                    seed=seed,
+                    rollout_id=str(art.summary.rollout_id),
                 )
-                verdicts: dict[str, str] = {}
-                rvals: dict[str, float] = {}
-                for design, (policy_id, profile) in DESIGNS.items():
-                    if profile == VerifierProfile.FULL:
-                        v = art.summary.verification
-                    else:
-                        v = executor.verifier.verify(bundle, art.episode, profile=profile)
-                    verdicts[design] = v.verdict.value
-                    rvals[design] = rewards.compute(v, policy_registry.get(policy_id)).final_reward
-                rows.append(
-                    HackingRow(
-                        task_id=bundle.spec.task_id,
-                        family=bundle.oracle.family_id,
-                        policy=policy,
-                        permissive_harness=permissive,
-                        deserves_reward=info.deserves_reward,
-                        verdicts=verdicts,
-                        rewards=rvals,
-                        v3_reasons=list(art.summary.verification.failure_reasons),
-                    )
-                )
+            )
+    if not summarize:
+        return rows, time.perf_counter() - t0, len(tasks)
     return summarize_hacking(rows, time.perf_counter() - t0, len(tasks))
+
+
+def episode_record(art: Any, **extra: Any) -> dict[str, Any]:
+    """Raw per-episode record for reproducibility bundles (summary + host-recorded facts)."""
+    return {
+        **extra,
+        "summary": art.summary.model_dump(mode="json"),
+        "episode": art.episode.model_dump(mode="json"),
+        "trajectory": art.trajectory.model_dump(mode="json"),
+    }
+
+
+def _design_stats(rows: list[HackingRow], design: str, threshold: float) -> dict[str, Any]:
+    undeserving = [r for r in rows if not r.deserves_reward]
+    deserving = [r for r in rows if r.deserves_reward]
+
+    def clustered(rs: list[HackingRow]) -> dict[str, Any]:
+        groups: dict[str, list[float]] = defaultdict(list)
+        for r in rs:
+            groups[r.task_id].append(float(r.rewards[design] >= threshold))
+        return cluster_bootstrap([groups[k] for k in sorted(groups)], seed=0)
+
+    fp = sum(r.rewards[design] >= threshold for r in undeserving)
+    tp = sum(r.rewards[design] >= threshold for r in deserving)
+    return {
+        "false_positive_reward_rate": proportion(fp, len(undeserving)),
+        "true_positive_reward_rate": proportion(tp, len(deserving)),
+        "false_positive_reward_rate_task_clustered": clustered(undeserving),
+        "true_positive_reward_rate_task_clustered": clustered(deserving),
+    }
+
+
+def _sensitivity(rows: list[HackingRow]) -> dict[str, Any]:
+    return {
+        d: [
+            {
+                "threshold": t,
+                "false_positive_reward_rate": _design_stats(rows, d, t)[
+                    "false_positive_reward_rate"
+                ],
+                "true_positive_reward_rate": _design_stats(rows, d, t)["true_positive_reward_rate"],
+            }
+            for t in SENSITIVITY_THRESHOLDS
+        ]
+        for d in DESIGNS
+    }
 
 
 def summarize_hacking(rows: list[HackingRow], duration: float, n_tasks: int) -> dict[str, Any]:
@@ -130,6 +195,7 @@ def summarize_hacking(rows: list[HackingRow], duration: float, n_tasks: int) -> 
         designs[d] = {
             "reward_policy": DESIGNS[d][0],
             "verifier_profile": DESIGNS[d][1].value,
+            **_design_stats(rows, d, REWARD_THRESHOLD),
             "false_positive_reward_rate": proportion(fp, len(undeserving)),
             "true_positive_reward_rate": proportion(tp, len(deserving)),
             "mean_reward_undeserving": sum(r.rewards[d] for r in undeserving)
@@ -151,10 +217,26 @@ def summarize_hacking(rows: list[HackingRow], duration: float, n_tasks: int) -> 
             / len(rs),
             "r3_rejection_reasons": dict(Counter(reason for r in rs for reason in r.v3_reasons)),
         }
+    policies_used = sorted({r.policy for r in rows})
     return {
         "experiment": "B_reward_hacking",
+        "evidence": SCRIPTED_EVIDENCE,
         "n_tasks": n_tasks,
+        "n_independent_tasks": len({r.task_id for r in rows}),
+        "seeds": sorted({r.seed for r in rows}),
         "n_episodes": len(rows),
+        "n_undeserving": len(undeserving),
+        "n_deserving": len(deserving),
+        "known_attack_coverage": {
+            "attacks": [p for p in policies_used if p in attack_catalog.by_set("development")],
+            "heldout_attacks_included": [
+                p for p in policies_used if p in attack_catalog.by_set("heldout")
+            ],
+            "note": "every attack in this experiment was known when verifier 1.0.0 / verified-v1 "
+            "were designed (development set); FP rates here do not measure robustness to unseen "
+            "attacks — see Experiment H.",
+        },
+        "reward_threshold_sensitivity": _sensitivity(rows),
         "duration_seconds": duration,
         "reward_threshold": REWARD_THRESHOLD,
         "designs": designs,
@@ -173,18 +255,32 @@ def hacking_markdown(doc: dict[str, Any]) -> str:
     lines = [
         "# Experiment B — reward hacking (R1 vs R2 vs R3)",
         "",
-        f"Episodes: {doc['n_episodes']} over {doc['n_tasks']} tasks. Reward counted as positive at ≥ "
-        f"{doc['reward_threshold']}. Ground truth is the scripted policy label, not any verifier.",
+        f"> **{SCRIPTED_EVIDENCE['label']}**",
         "",
-        "| Design | Verifier | False-positive reward rate (undeserving) | True-positive reward rate (deserving) |",
-        "|---|---|---|---|",
+        f"Episodes: {doc['n_episodes']} over {doc['n_tasks']} independent tasks (seeds "
+        f"{doc.get('seeds', [0])}). Reward counted as positive at ≥ {doc['reward_threshold']}. "
+        "Ground truth is the scripted policy label, not any verifier.",
+        "",
+        "Known-attack coverage: all adversarial policies here were known when R3 was designed "
+        "(development set). Robustness to unseen attacks is measured separately in Experiment H.",
+        "",
+        "Wilson intervals treat episodes as independent; task-clustered bootstrap intervals "
+        "resample the independent tasks and are the appropriate uncertainty for population claims.",
+        "",
+        "| Design | Verifier | False-positive reward rate (undeserving) | FP task-clustered CI "
+        "| True-positive reward rate (deserving) | TP task-clustered CI |",
+        "|---|---|---|---|---|---|",
     ]
     for d, v in doc["designs"].items():
         fp, tp = v["false_positive_reward_rate"], v["true_positive_reward_rate"]
         lines.append(
             f"| {d} | `{v['verifier_profile']}` | {fp['rate']:.1%} [{fp['ci_low']:.1%}, {fp['ci_high']:.1%}] "
-            f"(n={fp['n']}) | {tp['rate']:.1%} [{tp['ci_low']:.1%}, {tp['ci_high']:.1%}] (n={tp['n']}) |"
+            f"(n={fp['n']}) | {_cci(v.get('false_positive_reward_rate_task_clustered'))} | "
+            f"{tp['rate']:.1%} [{tp['ci_low']:.1%}, {tp['ci_high']:.1%}] (n={tp['n']}) | "
+            f"{_cci(v.get('true_positive_reward_rate_task_clustered'))} |"
         )
+    if doc.get("reward_threshold_sensitivity"):
+        lines += _sensitivity_md(doc["reward_threshold_sensitivity"])
     lines += [
         "",
         "## Per policy",
@@ -224,6 +320,155 @@ def hacking_markdown(doc: dict[str, Any]) -> str:
         "  outcomes; the static allow-list scan narrows but does not eliminate this surface.",
         "",
     ]
+    return "\n".join(lines)
+
+
+def _cci(c: dict[str, Any] | None) -> str:
+    if not c or c.get("ci_low") is None:
+        return "n/a"
+    return f"[{c['ci_low']:.1%}, {c['ci_high']:.1%}] ({c['n_clusters']} tasks)"
+
+
+def _sensitivity_md(sens: dict[str, Any]) -> list[str]:
+    thresholds = [row["threshold"] for row in next(iter(sens.values()))]
+    lines = [
+        "",
+        "## Reward-threshold sensitivity (false-positive / true-positive reward rate)",
+        "",
+        "| Design | " + " | ".join(f"≥ {t}" for t in thresholds) + " |",
+        "|---|" + "---|" * len(thresholds),
+    ]
+    for d, rows in sens.items():
+        cells = [
+            f"FP {r['false_positive_reward_rate']['rate']:.0%} / "
+            f"TP {r['true_positive_reward_rate']['rate']:.0%}"
+            for r in rows
+        ]
+        lines.append(f"| {d} | " + " | ".join(cells) + " |")
+    return lines
+
+
+# ============================================================================ Experiment H
+
+
+async def run_unseen_attacks(
+    executor: RolloutExecutor,
+    registry: TaskRegistry,
+    *,
+    per_template: int = 1,
+    seeds: tuple[int, ...] = (0,),
+    sink: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Development vs held-out attacks against R1/R2/R3 on identical tasks."""
+    from traceforge.modules.tasks.registry import VERIFIER_VERSION
+
+    dev = attack_catalog.by_set("development")
+    held = attack_catalog.by_set("heldout")
+    deserving = ("reference", "malformed_then_reference")
+    rows, duration, n_tasks = await run_reward_hacking(
+        executor,
+        registry,
+        per_template=per_template,
+        policies=dev + held + deserving,
+        seeds=seeds,
+        sink=sink,
+        summarize=False,
+    )
+    sets: dict[str, Any] = {}
+    for name, members in (("development", dev), ("heldout", held)):
+        subset = [r for r in rows if r.policy in members or r.policy in deserving]
+        sets[name] = {
+            "attacks": list(members),
+            "n_attack_episodes": sum(r.policy in members for r in subset),
+            "designs": {
+                d: {"reward_policy": DESIGNS[d][0], **_design_stats(subset, d, REWARD_THRESHOLD)}
+                for d in DESIGNS
+            },
+        }
+    per_attack: dict[str, Any] = {}
+    for policy in dev + held:
+        rs = [r for r in rows if r.policy == policy]
+        e = attack_catalog.entry(policy)
+        per_attack[policy] = {
+            "attack_set": e.attack_set,
+            "known_to_verifier_versions": list(e.known_to_verifier_versions),
+            "n": len(rs),
+            "rewarded_fraction": {
+                d: sum(r.rewards[d] >= REWARD_THRESHOLD for r in rs) / len(rs) for d in DESIGNS
+            },
+            "r3_verdicts": dict(Counter(r.verdicts["R3"] for r in rs)),
+            "r3_rewarded_tasks": sorted(
+                {r.task_id for r in rs if r.rewards["R3"] >= REWARD_THRESHOLD}
+            ),
+            "r3_rejection_reasons": dict(Counter(x for r in rs for x in r.v3_reasons)),
+        }
+    return {
+        "experiment": "H_unseen_attack_robustness",
+        "evidence": SCRIPTED_EVIDENCE,
+        "verifier_version": VERIFIER_VERSION,
+        "reward_policy": "verified-v1",
+        "attack_catalog": attack_catalog.catalog_document(),
+        "n_tasks": n_tasks,
+        "seeds": list(seeds),
+        "n_episodes": len(rows),
+        "duration_seconds": duration,
+        "reward_threshold": REWARD_THRESHOLD,
+        "sets": sets,
+        "per_attack": per_attack,
+        "reward_threshold_sensitivity": _sensitivity(rows),
+        "rows": [r.__dict__ for r in rows],
+        "notes": [
+            "held-out attacks were authored after verifier 1.0.0 / verified-v1 were frozen and were "
+            "not used to modify them; results are a first-contact measurement.",
+            "ground truth = scripted policy label (all attacks deserve no reward by construction).",
+            "if the verifier is changed in response, those attacks become development attacks for "
+            "the new verifier version (attack_catalog.known_to_verifier_versions).",
+        ],
+    }
+
+
+def unseen_attacks_markdown(doc: dict[str, Any]) -> str:
+    lines = [
+        "# Experiment H — unseen attack robustness",
+        "",
+        f"> **{doc['evidence']['label']}**",
+        "",
+        f"Verifier `{doc['verifier_version']}`, reward policy `{doc['reward_policy']}`. "
+        f"{doc['n_episodes']} episodes over {doc['n_tasks']} independent tasks, seeds "
+        f"{doc['seeds']}. Reward counted as positive at ≥ {doc['reward_threshold']}.",
+        "",
+        "Development attacks were known when R3 was designed; held-out attacks were written "
+        "afterwards and R3 was **not** modified in response.",
+        "",
+        "| Attack set | Design | False-positive reward rate | Task-clustered CI "
+        "| True-positive reward rate |",
+        "|---|---|---|---|---|",
+    ]
+    for name, st in doc["sets"].items():
+        for d, v in st["designs"].items():
+            fp, tp = v["false_positive_reward_rate"], v["true_positive_reward_rate"]
+            lines.append(
+                f"| {name} | {d} | {fp['rate']:.1%} [{fp['ci_low']:.1%}, {fp['ci_high']:.1%}] "
+                f"(n={fp['n']}) | {_cci(v['false_positive_reward_rate_task_clustered'])} | "
+                f"{tp['rate']:.1%} (n={tp['n']}) |"
+            )
+    lines += [
+        "",
+        "## Per attack",
+        "",
+        "| Attack | Set | Known to verifier versions | R1 | R2 | R3 rewarded "
+        "| R3 rewarded tasks | R3 verdicts |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for name, a in doc["per_attack"].items():
+        rf = a["rewarded_fraction"]
+        known = ", ".join(a["known_to_verifier_versions"]) or "none"
+        lines.append(
+            f"| {name} | {a['attack_set']} | {known} | {rf['R1']:.0%} | {rf['R2']:.0%} | "
+            f"{rf['R3']:.0%} | {', '.join(a['r3_rewarded_tasks']) or '—'} | {a['r3_verdicts']} |"
+        )
+    lines += _sensitivity_md(doc["reward_threshold_sensitivity"])
+    lines += ["", "## Notes", ""] + [f"- {n}" for n in doc["notes"]] + [""]
     return "\n".join(lines)
 
 
@@ -465,6 +710,7 @@ async def collect_verified_corpus(
     registry: TaskRegistry,
     policies: tuple[str, ...],
     per_template: int = 2,
+    sink: list[dict[str, Any]] | None = None,
 ) -> list[Trajectory]:
     out: list[Trajectory] = []
     bundles = pick_tasks(registry, per_template, splits=(Split.TRAIN,)) + pick_tasks(
@@ -476,6 +722,8 @@ async def collect_verified_corpus(
                 bundle, ProviderConfig(policy=policy), correlation_id=f"expA:{policy}"
             )
             out.append(art.trajectory)
+            if sink is not None:
+                sink.append(episode_record(art, policy=policy, seed=0))
     return out
 
 
