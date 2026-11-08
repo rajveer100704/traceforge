@@ -63,7 +63,11 @@ def test_environment_matches_trl_protocol(registry, sandbox) -> None:  # type: i
             "submit_final_report",
         ]
     )
-    from transformers.utils import get_json_schema
+    transformers_utils = pytest.importorskip(
+        "transformers.utils",
+        reason="TRL tool-schema compatibility requires the optional 'ml' dependencies",
+    )
+    get_json_schema = transformers_utils.get_json_schema
 
     for name in tools:  # each tool must produce a valid function schema (TRL renders these)
         schema = get_json_schema(getattr(env, name))
