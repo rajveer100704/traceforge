@@ -34,6 +34,12 @@ FORBIDDEN_CALLS = frozenset(
 FORBIDDEN_NAMES = frozenset({"__builtins__", "__loader__", "__spec__", "__file__", "__import__"})
 ALLOWED_DUNDER_ATTRS = frozenset({"__init__", "__name__", "__doc__"})
 ALWAYS_ALLOWED_IMPORTS = frozenset({"__future__", "typing", "dataclasses"})
+# Verifier 1.1.0: candidate code may not define rich-comparison methods. Remediation code for
+# these tasks never needs them, and an always-true ``__eq__`` defeats equality-based oracles
+# (held-out attack ``universal_equality``, Experiment H, verifier 1.0.0).
+FORBIDDEN_COMPARISON_DUNDERS = frozenset(
+    {"__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"}
+)
 
 
 @dataclass(frozen=True)
@@ -108,6 +114,22 @@ class _Visitor(ast.NodeVisitor):
     def visit_Name(self, node: ast.Name) -> None:
         if node.id in FORBIDDEN_NAMES:
             self._add(node, "forbidden_name", f"reference to '{node.id}' is not allowed")
+        self.generic_visit(node)
+
+    def _check_definition(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        if node.name in FORBIDDEN_COMPARISON_DUNDERS:
+            self._add(
+                node,
+                "comparison_dunder_definition",
+                f"definition of comparison method '{node.name}' is not allowed",
+            )
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._check_definition(node)
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._check_definition(node)
         self.generic_visit(node)
 
     def visit_Global(self, node: ast.Global) -> None:

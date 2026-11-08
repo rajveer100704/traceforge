@@ -9,7 +9,11 @@ from typing import Protocol
 
 from traceforge.contracts.tasks import Difficulty
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.1.0"
+# Value sampling (names, fixture values) is unchanged since 1.0.0; 1.1.0 changes only the
+# hidden-test oracle code. Keeping the sampling namespace fixed makes 1.0.0 vs 1.1.0 fixtures
+# differ solely in oracle strictness.
+RNG_NAMESPACE_VERSION = "1.0.0"
 
 
 @dataclass(frozen=True)
@@ -39,7 +43,7 @@ class TaskFamily(Protocol):
 
 def rng_for(family_id: str, template_id: str, seed: int) -> random.Random:
     # str seeding is deterministic across processes (sha512-based in CPython).
-    return random.Random(f"traceforge:{GENERATOR_VERSION}:{family_id}:{template_id}:{seed}")  # noqa: S311
+    return random.Random(f"traceforge:{RNG_NAMESPACE_VERSION}:{family_id}:{template_id}:{seed}")  # noqa: S311
 
 
 def render(template: str, **values: object) -> str:

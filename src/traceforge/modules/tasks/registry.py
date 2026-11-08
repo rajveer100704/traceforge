@@ -19,11 +19,11 @@ from traceforge.modules.tasks.families.base import GENERATOR_VERSION, RenderedTa
 from traceforge.modules.tasks.families.sql_injection import SqlInjectionFamily
 from traceforge.modules.tasks.families.ssrf import SsrfFamily
 
-TASK_VERSION = "1.0.0"
+TASK_VERSION = "1.1.0"
 SPLIT_POLICY = "template-holdout"
 SPLIT_POLICY_VERSION = "1"
 VERIFIER_ID = "traceforge.hidden-tests"
-VERIFIER_VERSION = "1.0.0"
+VERIFIER_VERSION = "1.1.0"
 HIDDEN_TEST_MODULE = "test_hidden.py"
 AGENT_TOOLS: tuple[str, ...] = (
     "list_files",

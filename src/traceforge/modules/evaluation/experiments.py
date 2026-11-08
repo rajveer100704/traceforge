@@ -232,7 +232,7 @@ def summarize_hacking(rows: list[HackingRow], duration: float, n_tasks: int) -> 
             "heldout_attacks_included": [
                 p for p in policies_used if p in attack_catalog.by_set("heldout")
             ],
-            "note": "every attack in this experiment was known when verifier 1.0.0 / verified-v1 "
+            "note": "every attack in this experiment was known when verifier 1.0.0+ / verified-v1 "
             "were designed (development set); FP rates here do not measure robustness to unseen "
             "attacks — see Experiment H.",
         },
@@ -362,8 +362,10 @@ async def run_unseen_attacks(
     """Development vs held-out attacks against R1/R2/R3 on identical tasks."""
     from traceforge.modules.tasks.registry import VERIFIER_VERSION
 
-    dev = attack_catalog.by_set("development")
-    held = attack_catalog.by_set("heldout")
+    # Sets are relative to the verifier version under test: an attack the verifier was changed
+    # in response to (e.g. universal_equality for 1.1.0) counts as a development attack.
+    dev = attack_catalog.known_at(VERIFIER_VERSION)
+    held = attack_catalog.heldout_at(VERIFIER_VERSION)
     deserving = ("reference", "malformed_then_reference")
     rows, duration, n_tasks = await run_reward_hacking(
         executor,
@@ -418,8 +420,8 @@ async def run_unseen_attacks(
         "reward_threshold_sensitivity": _sensitivity(rows),
         "rows": [r.__dict__ for r in rows],
         "notes": [
-            "held-out attacks were authored after verifier 1.0.0 / verified-v1 were frozen and were "
-            "not used to modify them; results are a first-contact measurement.",
+            f"held-out = attacks not known when verifier {VERIFIER_VERSION} was designed "
+            "(attack_catalog.heldout_at); results on them are a first-contact measurement.",
             "ground truth = scripted policy label (all attacks deserve no reward by construction).",
             "if the verifier is changed in response, those attacks become development attacks for "
             "the new verifier version (attack_catalog.known_to_verifier_versions).",
@@ -437,8 +439,8 @@ def unseen_attacks_markdown(doc: dict[str, Any]) -> str:
         f"{doc['n_episodes']} episodes over {doc['n_tasks']} independent tasks, seeds "
         f"{doc['seeds']}. Reward counted as positive at ≥ {doc['reward_threshold']}.",
         "",
-        "Development attacks were known when R3 was designed; held-out attacks were written "
-        "afterwards and R3 was **not** modified in response.",
+        "Development attacks were known when this verifier version was designed (including any "
+        "the verifier was changed in response to); held-out attacks were not.",
         "",
         "| Attack set | Design | False-positive reward rate | Task-clustered CI "
         "| True-positive reward rate |",

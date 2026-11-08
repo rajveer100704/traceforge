@@ -1,5 +1,39 @@
 # Implementation status — TraceForge
 
+## Verifier 1.1.0 — universal-equality hardening (branch `fix/verifier-1.1.0-universal-equality`, stacked on v0.2)
+
+Verified 2026-11-09 · Windows 11 · Python 3.12 · no GPU · Docker Desktop 28.3.2.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Static rule: no `__eq__/__ne__/__lt__/__le__/__gt__/__ge__` definitions (sync + async) | ✅ | `verification/safety.py` (`comparison_dunder_definition`); 13 scanner tests |
+| Pre-execution gate: rejected before any hidden/visible run | ✅ | `NoExecSandbox` test: zero sandbox calls, verdict FAIL |
+| Exact-type hidden SQL oracles (T0/T1/T2) | ✅ | `_assert_exact` / `_rows`; exploit run directly against hidden tests (scanner bypassed): 0 tests pass on all 3 templates; reference fix passes all |
+| End-to-end: `universal_equality` gets no R3 reward | ✅ | FAIL, reward 0.0, reason `comparison_dunder_definition` on sqli-t0/t1/t2; reference 0.96 |
+| Versions → 1.1.0 (generator, task, verifier, engine) | ✅ | all 39 tasks report 1.1.0; `traceforge tasks validate`: 0 problems; value sampling unchanged (visible files identical to 1.0.0) |
+| Attack catalogue | ✅ | `known_at("1.0.0")` unchanged; `known_at("1.1.0")` = development + `universal_equality`; 4 attacks remain held out for 1.1.0 |
+| Historical v0.2.0 Experiment H (verifier 1.0.0) | preserved | `research/results/experiment_H/` and the v0.2.0 technical report are unchanged |
+
+| Command | Result |
+|---|---|
+| `uv run pytest tests/integration/test_verifier_110.py` | 25 passed |
+| `uv run pytest --cov=traceforge` | **238 passed, 3 skipped** (no CUDA; Postgres URL unset; Windows symlink privilege), 87 % coverage |
+| `uv run ruff check` / `ruff format --check` / `mypy` (115 files) / `bandit` | clean |
+| `uv run pip-audit` | No known vulnerabilities found |
+| `uv run traceforge db check` | no drift (head 0001; versions are data, no schema change) |
+| `uv run traceforge demo` | demo PASSED |
+| Docker sandbox test (`-m docker`), 10 consecutive runs | 10/10 passed (8–33 s each); also passed inside the full suite |
+
+Docker flakiness: the single failure seen during v0.2 (first run right after an image rebuild, 106 s,
+output not captured) has not recurred in 12 later runs. Likely cause: a container wait exceeding the
+20 s isolated-verifier budget under heavy host load. Not confirmed.
+
+Not executed: real-CUDA tests (no GPU); PostgreSQL migration test locally (CI `postgres` job covers it);
+Experiment H has not been re-run against verifier 1.1.0. Any 1.1.0 robustness claim needs that rerun,
+on the four attacks that remain held out for it.
+
+---
+
 ## v0.2 — research integrity and hardening (branch `feat/v0.2-research-integrity`)
 
 Verified 2026-11-09 · Windows 11 · Python 3.12 · uv 0.10.7 · no GPU · Docker Desktop 28.3.2 running.

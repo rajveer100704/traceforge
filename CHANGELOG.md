@@ -1,5 +1,45 @@
 # Changelog
 
+## Verifier 1.1.0 — universal-equality hardening (unreleased; stacked on 0.2.0)
+
+### Background: the 1.0.0 weakness
+Experiment H (v0.2.0, 2026-11-09) found that verifier 1.0.0 rewarded the held-out
+`universal_equality` attack, in which the target function returns an object whose `__eq__` always
+answers True. It passed in 6 of 27 episodes, all on SQL-injection templates t1 and t2; the
+held-out R3 false-positive rate was 4.4 % (6/135). That historical result is unchanged: the
+v0.2.0 outputs in `research/results/experiment_H/` and the v0.2.0 technical report were produced
+with verifier 1.0.0 and are kept as recorded.
+
+### Two independent protections
+1. **Static safety (pre-execution):** candidate code may not define `__eq__`, `__ne__`, `__lt__`,
+   `__le__`, `__gt__` or `__ge__` (sync or async, any nesting level, called or not). Finding code
+   `comparison_dunder_definition`. The static gate fails before any hidden or visible test runs.
+2. **Exact-type hidden SQL oracles (defence in depth):** every hidden SQL test (T0 lookup, T1
+   catalogue search, T2 ledger query) now uses `_assert_exact(actual, expected)` and `_rows(...)`.
+   These check exact runtime types first, recursively through lists, tuples and dicts, reject
+   subclasses of built-in result types, and compare values only between identical built-in
+   types. Expected functional and security behaviour is unchanged. Visible tests are unchanged.
+
+### Versions
+- `GENERATOR_VERSION`, `TASK_VERSION`, `VERIFIER_VERSION`, `ENGINE_VERSION`: 1.0.0 → 1.1.0.
+  Hidden-test content changed, so every task has a new immutable version and fixture hash.
+- Value sampling (names, fixture values, visible files) is deliberately unchanged
+  (`RNG_NAMESPACE_VERSION = "1.0.0"`); 1.1.0 fixtures differ from 1.0.0 only in oracle code.
+- Example traces and task specs regenerated for task version 1.1.0.
+
+### Attack catalogue
+- `universal_equality` keeps `attack_set: heldout` (authoring-time classification) and is now
+  `known_to_verifier_versions: ["1.1.0"]`. It was held out for 1.0.0 and is a **development
+  attack for 1.1.0**.
+- Development attacks are known to 1.0.0 and 1.1.0. New `heldout_at(version)`.
+  `known_at("1.0.0")` is unchanged; the other four held-out attacks remain held out for 1.1.0.
+- Experiment H now derives its development/held-out sets from the verifier version under test.
+
+### Limits
+This removes one known exploit class. It does not show that the verifier is ungameable: robustness
+claims for 1.1.0 can only come from attacks that remain held out for it (currently four), and new
+held-out attacks are needed.
+
 ## 0.2.0 — research integrity and hardening (unreleased)
 
 ### Added
