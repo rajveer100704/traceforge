@@ -1,6 +1,6 @@
 # Changelog
 
-## Verifier 1.1.0 — universal-equality hardening (unreleased; stacked on 0.2.0)
+## Verifier 1.1.0 — universal-equality hardening (released in 0.2.0, 2026-11-09)
 
 ### Background: the 1.0.0 weakness
 Experiment H (v0.2.0, 2026-11-09) found that verifier 1.0.0 rewarded the held-out
@@ -76,7 +76,10 @@ This removes one known exploit class. It does not show that the verifier is unga
 claims for 1.1.0 can only come from attacks that remain held out for it (currently four), and new
 held-out attacks are needed.
 
-## 0.2.0 — research integrity and hardening (unreleased)
+## 0.2.0 — research integrity and hardening (2026-11-09)
+
+Ships task/verifier version 1.1.0 (section above). Task version 1.0.0 remains available,
+by explicit version only, for re-verifying rollouts recorded against it.
 
 ### Added
 - Explicit training device/precision selection (`device`, `precision`) with fail-closed CUDA and
@@ -100,5 +103,12 @@ held-out attacks are needed.
 - Experiment H found that verifier 1.0.0 rewards the held-out `universal_equality` attack on two
   SQL-injection templates (6/27 episodes; R3 held-out FP rate 4.4 %, 6/135). Not fixed in this
   release, to keep the held-out measurement clean; proposed fix for verifier 1.1.0 in the report.
+  (Resolved before release: verifier 1.1.0, above, ships in 0.2.0 and rejects this attack. The
+  1.0.0 measurement and the technical report are kept unchanged as the historical record.)
 - Container images still carry 11 HIGH CVEs with no Debian fix (time-bounded exceptions until
   2026-12-09); see `docs/security/container-vulnerabilities.md`.
+
+## 0.1.0 — initial research release (2026-11-08)
+
+First public release. See the GitHub release notes:
+https://github.com/rajveer100704/traceforge/releases/tag/v0.1.0
