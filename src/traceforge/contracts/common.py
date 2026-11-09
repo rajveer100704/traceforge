@@ -114,6 +114,10 @@ class ConflictError(TraceForgeError):
     code = ErrorCode.CONFLICT
 
 
+class UnsupportedTaskVersion(ConflictError):
+    """The task exists but this instance cannot execute the requested version (never substituted)."""
+
+
 class ValidationFailure(TraceForgeError):
     code = ErrorCode.VALIDATION_ERROR
 

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session, selectinload
 
 from traceforge.contracts.common import ArtifactRef, ConflictError, NotFoundError, sha256_json
@@ -67,39 +68,81 @@ class TaskRepository:
     def __init__(self, session: Session) -> None:
         self.s = session
 
-    def upsert_bundle(self, bundle: TaskBundle, oracle_artifact_id: uuid.UUID | None) -> uuid.UUID:
-        spec, oracle = bundle.spec, bundle.oracle
-        task = self.s.scalar(select(m.Task).where(m.Task.task_id == spec.task_id))
-        if task is None:
-            task = m.Task(task_id=spec.task_id, family_id=oracle.family_id, category=spec.category)
-            self.s.add(task)
-            self.s.flush()
-        version = self.s.scalar(
-            select(m.TaskVersion).where(
-                m.TaskVersion.task_pk == task.id, m.TaskVersion.version == spec.version
+    def _insert_if_absent(
+        self, model: type[Any], values: dict[str, Any], conflict_on: list[str]
+    ) -> None:
+        """INSERT ... ON CONFLICT DO NOTHING on the given unique columns (SQLite, PostgreSQL).
+
+        Only a conflict on exactly those columns is absorbed; any other integrity error still
+        raises. Callers re-read and validate the stored row afterwards.
+        """
+        dialect = self.s.get_bind().dialect.name
+        stmt: Any
+        if dialect == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            stmt = (
+                pg_insert(model).values(**values).on_conflict_do_nothing(index_elements=conflict_on)
             )
+        elif dialect == "sqlite":
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+            stmt = (
+                sqlite_insert(model)
+                .values(**values)
+                .on_conflict_do_nothing(index_elements=conflict_on)
+            )
+        else:  # pragma: no cover - only SQLite and PostgreSQL are supported
+            raise ConflictError(f"unsupported database dialect for idempotent upsert: {dialect}")
+        self.s.execute(stmt)
+
+    def upsert_bundle(self, bundle: TaskBundle, oracle_artifact_id: uuid.UUID | None) -> uuid.UUID:
+        """Idempotent, concurrency-safe registration of an immutable task version.
+
+        Concurrent callers registering the same version all succeed and get the same row id;
+        a different fixture hash under an existing (task_id, version) raises ConflictError.
+        """
+        spec, oracle = bundle.spec, bundle.oracle
+        self._insert_if_absent(
+            m.Task,
+            {
+                "id": uuid.uuid4(),
+                "task_id": spec.task_id,
+                "family_id": oracle.family_id,
+                "category": spec.category,
+            },
+            ["task_id"],
         )
-        if version is not None:
-            if version.fixture_hash != oracle.fixture_hash:
-                raise ConflictError(
-                    f"task {spec.key} is immutable; content differs from registered version"
-                )
-            return version.id
-        version = m.TaskVersion(
-            task_pk=task.id,
-            version=spec.version,
-            split=oracle.split.value,
-            template_id=oracle.template_id,
-            seed=oracle.seed,
-            generator_version=oracle.generator_version,
-            fixture_hash=oracle.fixture_hash,
-            difficulty=spec.difficulty.value,
-            spec=spec.model_dump(mode="json"),
-            oracle_artifact_id=oracle_artifact_id,
+        task_pk = self.s.scalar(select(m.Task.id).where(m.Task.task_id == spec.task_id))
+        if task_pk is None:  # pragma: no cover - the row was inserted or already existed
+            raise ConflictError(f"task {spec.task_id} could not be registered")
+        self._insert_if_absent(
+            m.TaskVersion,
+            {
+                "id": uuid.uuid4(),
+                "task_pk": task_pk,
+                "version": spec.version,
+                "split": oracle.split.value,
+                "template_id": oracle.template_id,
+                "seed": oracle.seed,
+                "generator_version": oracle.generator_version,
+                "fixture_hash": oracle.fixture_hash,
+                "difficulty": spec.difficulty.value,
+                "spec": spec.model_dump(mode="json"),
+                "oracle_artifact_id": oracle_artifact_id,
+            },
+            ["task_pk", "version"],
         )
-        self.s.add(version)
-        self.s.flush()
-        return version.id
+        row = self.s.execute(
+            select(m.TaskVersion.id, m.TaskVersion.fixture_hash).where(
+                m.TaskVersion.task_pk == task_pk, m.TaskVersion.version == spec.version
+            )
+        ).one()
+        if row.fixture_hash != oracle.fixture_hash:
+            raise ConflictError(
+                f"task {spec.key} is immutable; content differs from registered version"
+            )
+        return uuid.UUID(str(row.id))
 
     def version_id(self, task_id: str, version: str) -> uuid.UUID:
         row = self.s.scalar(
@@ -118,8 +161,14 @@ class TaskRepository:
         family: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        allowed: Iterable[tuple[str, str]] | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         q = select(m.TaskVersion, m.Task).join(m.Task)
+        if allowed is not None:
+            # Only versions the calling instance can execute (rows synced by other instances,
+            # e.g. a newer release during a rolling upgrade, are not advertised).
+            pairs = list(allowed)
+            q = q.where(tuple_(m.Task.task_id, m.TaskVersion.version).in_(pairs))
         if split:
             q = q.where(m.TaskVersion.split == split)
         if family:

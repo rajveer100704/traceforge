@@ -1,0 +1,16 @@
+# False positives: SHA-256 task fixture digests (public content hashes, not secrets) on the
+# authz-* lines of legacy_1_0_0.py in commit bb802bf. Later commits mark these lines with
+# inline 'gitleaks:allow' comments. Fingerprints are exact: no rule or path is allowlisted.
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:19
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:20
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:21
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:22
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:23
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:24
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:25
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:26
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:27
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:28
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:29
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:30
+bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:31

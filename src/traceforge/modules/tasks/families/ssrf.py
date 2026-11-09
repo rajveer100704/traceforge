@@ -308,7 +308,8 @@ class SsrfFamily:
         "collections",
     )
 
-    def render(self, template_id: str, seed: int) -> RenderedTask:
+    def render(self, template_id: str, seed: int, oracle_version: str = "1.1.0") -> RenderedTask:
+        # hidden tests for this family are identical in oracle versions 1.0.0 and 1.1.0
         rng = rng_for(self.family_id, template_id, seed)
         public_host, rebind_host = rng.sample(PUBLIC_HOSTS, 2)
         values: dict[str, object] = dict(

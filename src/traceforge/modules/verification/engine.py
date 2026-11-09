@@ -32,7 +32,7 @@ from traceforge.domain.ports import SandboxProvider
 from traceforge.modules.verification import checks
 
 log = logging.getLogger(__name__)
-ENGINE_VERSION = "1.0.0"
+ENGINE_VERSION = "1.1.0"
 VISIBLE_TEST_PATH = "tests/test_visible.py"
 
 

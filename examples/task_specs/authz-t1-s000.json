@@ -1,6 +1,6 @@
 {
   "task_id": "authz-t1-s000",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "domain": "cybersecurity",
   "category": "access_control_remediation",
   "title": "Broken access control remediation (update_profile)",
@@ -14,7 +14,7 @@
     "submit_evidence",
     "submit_final_report"
   ],
-  "environment_ref": "local-fixture:access_control/t1@1.0.0",
+  "environment_ref": "local-fixture:access_control/t1@1.1.0",
   "budget": {
     "max_actions": 20,
     "max_wall_seconds": 120.0,

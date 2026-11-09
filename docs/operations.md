@@ -73,3 +73,49 @@ The recovery loop runs inside `traceforge worker` every 60 s; the API runs one r
 
 Raw traces are retained in object storage (configurable `TRACEFORGE_RAW_RETENTION_DAYS` for external
 lifecycle rules). `make clean` never deletes data; `make clean-data` is the explicit destructive target.
+
+## Task versions and rolling upgrades (verifier 1.1.0+)
+
+Each instance builds an in-memory task registry: the **current** task version (new work,
+listings, benchmark selection) plus **historical** versions kept only for re-verifying rollouts
+recorded against them. Today that means current 1.1.0 and historical 1.0.0. Historical bundles are
+rebuilt by a frozen legacy renderer, and registration fails if a rebuilt bundle's fixture hash
+differs from the hash pinned from the original release.
+
+Guarantees:
+
+- **No version substitution.** A rollout request is pinned to a concrete task version when it is
+  accepted (`RolloutRequest.task_version`), so a queued or retried job always runs the version it
+  was accepted with. An instance asked for a version it cannot execute raises
+  `UnsupportedTaskVersion` (HTTP 409, with `available` versions). It never runs a different version.
+- **Only executable versions are advertised.** `GET /api/v1/tasks` lists only the versions this
+  instance runs as current, even if other instances have synced newer rows into the shared
+  database. `GET /api/v1/tasks/{id}` resolves through the instance's own registry.
+- **Idempotent, concurrency-safe sync.** `TaskService.sync_registry` uses
+  `INSERT ... ON CONFLICT DO NOTHING` on the unique keys (SQLite and PostgreSQL), then re-reads and
+  validates the fixture hash. Concurrent syncs of the same version all succeed with one row; a
+  different hash under an existing `(task_id, version)` raises `ConflictError`.
+- **Visible skew.** `/health/ready` reports `checks.task_versions` (what this instance can execute)
+  and `checks.task_version_skew` (versions in the shared DB it cannot execute). Skew is
+  informational: it does not make the instance unready.
+
+Safe rolling-upgrade order (e.g. 1.0.0 → 1.1.0):
+
+1. Upgrade **workers** first. New workers execute both 1.1.0 and 1.0.0, so they can finish jobs
+   accepted by old API instances.
+2. Then upgrade **API instances**. Until an API instance is upgraded it keeps accepting, and
+   pinning, 1.0.0 jobs, which the new workers still execute.
+3. Old workers that receive a 1.1.0 job fail it explicitly instead of running 1.0.0. v0.2 workers
+   raise `NotFoundError`; this release raises `UnsupportedTaskVersion`. Drain old workers before
+   upgrading the API if you want to avoid those failures.
+4. Watch `task_version_skew` on each instance until it is empty everywhere.
+
+Caveat for the first upgrade away from v0.2: v0.2 API instances do not pin a version at
+acceptance. A job they accepted without an explicit `task_version` is resolved when it executes,
+so an upgraded worker runs it as 1.1.0. To keep such jobs on 1.0.0, drain the v0.2 queue before
+upgrading workers, or submit with an explicit `task_version`. From this release on, every accepted
+job is pinned.
+
+Re-verifying a rollout whose task version is no longer bundled (beyond the historical set) fails
+with an actionable error. Use the TraceForge commit recorded in the rollout's reproducibility
+bundle.

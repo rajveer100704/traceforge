@@ -1,0 +1,193 @@
+{
+  "bundle_format_version": "1",
+  "checkpoints": [],
+  "configs": {
+    "experiment_H": {
+      "config": {
+        "per_template": 1,
+        "seeds": [
+          0,
+          1,
+          2
+        ]
+      },
+      "config_hash": "5e6e0cfaa83b5f401e228c6c9fc01c043cbc7ee6b83f21bf23855889f874c8f5"
+    }
+  },
+  "created_at": "2026-11-08T23:02:49.089071+00:00",
+  "datasets": [],
+  "environment": {
+    "cpu_count": 12,
+    "device": {
+      "cuda_available": false,
+      "cuda_version": null,
+      "cudnn_version": null,
+      "device": "cpu",
+      "device_type": "cpu",
+      "gpu_count": 0,
+      "gpu_memory_gb": [],
+      "gpu_names": [],
+      "precision": "fp32",
+      "requested_device": "auto",
+      "requested_precision": "auto",
+      "torch_version": "2.15.0+cpu"
+    },
+    "implementation": "CPython",
+    "machine": "AMD64",
+    "packages": {
+      "accelerate": "1.15.0",
+      "datasets": "5.1.0",
+      "peft": "0.21.2",
+      "torch": "2.15.0",
+      "traceforge": "0.1.0",
+      "transformers": "5.22.2",
+      "trl": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26100-SP0",
+    "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python": "3.12.12"
+  },
+  "episodes": {
+    "count": 459,
+    "file": "episodes.jsonl.gz",
+    "reason": null
+  },
+  "evaluation_ids": [],
+  "experiment": "H",
+  "files_sha256": {
+    "REPRODUCE.md": "d1fc94d80818707ce97bdbfeac932c72a3c897746ea9af850429c991e5cafc1a",
+    "episodes.jsonl.gz": "8693d31d34e71fd0ed1b33495e700cae269acad280ea219dfc21fa0ed78a847f",
+    "metrics.json": "e3f7c577065e8eeb2deb3c8631c6037de84414b21870c091afb86f9b95e775a3"
+  },
+  "git": {
+    "branch": "fix/verifier-1.1.0-universal-equality",
+    "commit": "137fcccacb1b9e9729ac6dd6f5a914d53fdf280a",
+    "dirty": true,
+    "dirty_files": [
+      "M docs/operations.md",
+      " M src/traceforge/api/routes/runs.py",
+      " M src/traceforge/api/routes/system.py",
+      " M src/traceforge/api/routes/tasks.py",
+      " M src/traceforge/application/container.py",
+      " M src/traceforge/application/reproducibility.py",
+      " M src/traceforge/application/services.py",
+      " M src/traceforge/contracts/common.py",
+      " M src/traceforge/infrastructure/database/repositories.py",
+      " M src/traceforge/modules/evaluation/attack_catalog.py",
+      " M src/traceforge/modules/tasks/families/access_control.py",
+      " M src/traceforge/modules/tasks/families/base.py",
+      " M src/traceforge/modules/tasks/families/sql_injection.py",
+      " M src/traceforge/modules/tasks/families/ssrf.py",
+      " M src/traceforge/modules/tasks/registry.py",
+      " M src/traceforge/modules/verification/safety.py",
+      " M tests/integration/test_api.py",
+      " M tests/integration/test_verifier_110.py"
+    ]
+  },
+  "models": [
+    {
+      "model_id": null,
+      "reason": "no learned model was trained or evaluated"
+    }
+  ],
+  "provenance": {
+    "attack_catalog_version": "1",
+    "dataset_split_policy": {
+      "id": "task-split-or-hash",
+      "version": "1"
+    },
+    "dataset_transformation": {
+      "id": "traceforge.dataset_builder",
+      "version": "1.0.0"
+    },
+    "leakage_checks_version": "2",
+    "n_tasks": 39,
+    "reward_policies": {
+      "self-report-r1": {
+        "policy_hash": "1c453fdd4a7319a49fcc82c7184593ad16b6138f70e24f7962c97ab9f57ea090",
+        "version": "1.0.0"
+      },
+      "verified-v1": {
+        "policy_hash": "34d1e4c5ce337706eca4aefc1327bdf81e721417cf825d5de38e83d6ed6cd371",
+        "version": "1.0.0"
+      },
+      "visible-tests-r2": {
+        "policy_hash": "da4ee2f7dcfa9aa05c712dc7ae5646317aba4c4790952b5b830cdd37ac3726b1",
+        "version": "1.0.0"
+      }
+    },
+    "task_catalogue_hash": "67d9d8d89ef3e3bbd85c9828a5df80560e0a50ddf0ddd44f108636571749802d",
+    "task_generator_version": "1.1.0",
+    "task_split_policy": {
+      "id": "template-holdout",
+      "version": "1"
+    },
+    "task_version": "1.1.0",
+    "traceforge_version": "0.1.0",
+    "verifier": {
+      "config_hash": "07f869f8f77db97d64b2917d7d5215dd77d147b920b95bc34ec5c6e20f44cc8c",
+      "engine_version": "1.1.0",
+      "hidden_test_module": "test_hidden.py",
+      "static_safety": {
+        "allowed_dunder_attrs": [
+          "__doc__",
+          "__init__",
+          "__name__"
+        ],
+        "always_allowed_imports": [
+          "__future__",
+          "dataclasses",
+          "typing"
+        ],
+        "forbidden_calls": [
+          "__import__",
+          "breakpoint",
+          "compile",
+          "delattr",
+          "eval",
+          "exec",
+          "exit",
+          "globals",
+          "help",
+          "input",
+          "locals",
+          "memoryview",
+          "open",
+          "quit",
+          "setattr",
+          "vars"
+        ],
+        "forbidden_comparison_dunders": [
+          "__eq__",
+          "__ge__",
+          "__gt__",
+          "__le__",
+          "__lt__",
+          "__ne__"
+        ],
+        "forbidden_names": [
+          "__builtins__",
+          "__file__",
+          "__import__",
+          "__loader__",
+          "__spec__"
+        ],
+        "frame_attrs": [
+          "_getframe",
+          "f_back",
+          "f_globals",
+          "f_locals",
+          "gi_frame",
+          "tb_frame"
+        ]
+      },
+      "verifier_id": "traceforge.hidden-tests",
+      "verifier_version": "1.1.0"
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}

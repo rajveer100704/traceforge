@@ -66,6 +66,7 @@ def git_state(cwd: Path | None = None) -> dict[str, Any]:
 def verifier_provenance() -> dict[str, Any]:
     from traceforge.modules.tasks.registry import HIDDEN_TEST_MODULE, VERIFIER_ID, VERIFIER_VERSION
     from traceforge.modules.verification import safety
+    from traceforge.modules.verification.engine import ENGINE_VERSION
 
     effective = {
         "verifier_id": VERIFIER_ID,
@@ -76,7 +77,10 @@ def verifier_provenance() -> dict[str, Any]:
             "forbidden_names": sorted(safety.FORBIDDEN_NAMES),
             "allowed_dunder_attrs": sorted(safety.ALLOWED_DUNDER_ATTRS),
             "always_allowed_imports": sorted(safety.ALWAYS_ALLOWED_IMPORTS),
+            "forbidden_comparison_dunders": sorted(safety.FORBIDDEN_COMPARISON_DUNDERS),
+            "frame_attrs": sorted(safety.FRAME_ATTRS),
         },
+        "engine_version": ENGINE_VERSION,
     }
     return {**effective, "config_hash": sha256_json(effective)}
 

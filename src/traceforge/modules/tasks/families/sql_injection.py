@@ -29,6 +29,38 @@ PRODUCT_SETS = [
     ("lamp", ["desk lamp", "floor lamp", "office chair", "kid's lamp shade", "monitor"]),
 ]
 
+ORACLE_HELPERS = '''
+
+def _assert_exact(actual, expected):
+    """Exact-type oracle (verifier 1.1.0): types first, recursively, then values.
+
+    Rejects look-alike objects (e.g. an always-equal __eq__) and subclasses of built-in result
+    types; equality is only evaluated between values of identical built-in types.
+    """
+    assert type(actual) is type(expected), (
+        f"expected {type(expected).__name__}, got {type(actual).__name__}"
+    )
+    if type(expected) in (list, tuple):
+        assert len(actual) == len(expected), f"expected {len(expected)} items, got {len(actual)}"
+        for got, want in zip(actual, expected):
+            _assert_exact(got, want)
+    elif type(expected) is dict:
+        assert all(type(k) in (str, int) for k in actual), "dict keys must be str or int"
+        assert sorted(map(repr, actual)) == sorted(map(repr, expected)), "dict keys differ"
+        for key, want in expected.items():
+            _assert_exact(actual[key], want)
+    else:
+        assert actual == expected, f"{actual!r} != {expected!r}"
+
+
+def _rows(result):
+    """A query result must be a real list of real tuples before it is inspected."""
+    assert type(result) is list, f"expected list, got {type(result).__name__}"
+    for row in result:
+        assert type(row) is tuple, f"expected tuple rows, got {type(row).__name__}"
+    return result
+'''
+
 T0_MODULE = '''"""$title_entity directory backed by SQLite (synthetic TraceForge task)."""
 
 import sqlite3
@@ -86,6 +118,7 @@ def test_visible_rejects_basic_attack():
 T0_HIDDEN = """import sqlite3
 
 from app.$module import $add_fn, $find_fn, $init_fn
+$oracle_helpers
 
 ROWS = [("$u1", "$v1"), ("$u2", "$v2"), ("$u3", "$v3"), ("$quoted", "$v1")]
 
@@ -99,39 +132,40 @@ def _conn():
 
 
 def test_func_exact_match():
-    rows = $find_fn(_conn(), "$u2")
-    assert [(r[1], r[2]) for r in rows] == [("$u2", "$v2")]
+    rows = _rows($find_fn(_conn(), "$u2"))
+    _assert_exact([(r[1], r[2]) for r in rows], [("$u2", "$v2")])
 
 
 def test_func_missing():
-    assert $find_fn(_conn(), "$missing") == []
+    _assert_exact($find_fn(_conn(), "$missing"), [])
 
 
 def test_func_quote_in_value():
-    rows = $find_fn(_conn(), "$quoted")
-    assert len(rows) == 1 and rows[0][1] == "$quoted"
+    rows = _rows($find_fn(_conn(), "$quoted"))
+    _assert_exact(len(rows), 1)
+    _assert_exact(rows[0][1], "$quoted")
 
 
 def test_func_no_wildcards():
-    assert $find_fn(_conn(), "%") == []
+    _assert_exact($find_fn(_conn(), "%"), [])
 
 
 def test_sec_tautology():
-    assert $find_fn(_conn(), "' OR '1'='1") == []
+    _assert_exact($find_fn(_conn(), "' OR '1'='1"), [])
 
 
 def test_sec_comment_bypass():
-    assert $find_fn(_conn(), "$u1' OR 1=1 --") == []
+    _assert_exact($find_fn(_conn(), "$u1' OR 1=1 --"), [])
 
 
 def test_sec_union():
-    assert $find_fn(_conn(), "x' UNION SELECT 1, name, sql FROM sqlite_master --") == []
+    _assert_exact($find_fn(_conn(), "x' UNION SELECT 1, name, sql FROM sqlite_master --"), [])
 
 
 def test_sec_stacked_query():
     conn = _conn()
-    assert $find_fn(conn, "x'; DROP TABLE $table; --") == []
-    assert conn.execute("SELECT COUNT(*) FROM $table").fetchone()[0] == len(ROWS)
+    _assert_exact($find_fn(conn, "x'; DROP TABLE $table; --"), [])
+    _assert_exact(conn.execute("SELECT COUNT(*) FROM $table").fetchone()[0], len(ROWS))
 """
 
 T1_MODULE = '''"""Catalogue search for $table (synthetic TraceForge task)."""
@@ -182,6 +216,7 @@ def test_visible_rejects_basic_attack():
 T1_HIDDEN = """import sqlite3
 
 from app.$module import $init_fn, $search_fn
+$oracle_helpers
 
 NAMES = $names
 
@@ -193,27 +228,27 @@ def _conn():
 
 
 def test_func_substring_order():
-    assert $search_fn(_conn(), "$needle") == $expected
+    _assert_exact($search_fn(_conn(), "$needle"), $expected)
 
 
 def test_func_apostrophe_term():
-    assert $search_fn(_conn(), "$apos_term") == [$apos_name]
+    _assert_exact($search_fn(_conn(), "$apos_term"), [$apos_name])
 
 
 def test_func_empty_result():
-    assert $search_fn(_conn(), "qqqq") == []
+    _assert_exact($search_fn(_conn(), "qqqq"), [])
 
 
 def test_sec_or_true():
-    assert $search_fn(_conn(), "x' OR 'a'='a") == []
+    _assert_exact($search_fn(_conn(), "x' OR 'a'='a"), [])
 
 
 def test_sec_union_schema_leak():
-    assert $search_fn(_conn(), "%' UNION SELECT sql FROM sqlite_master --") == []
+    _assert_exact($search_fn(_conn(), "%' UNION SELECT sql FROM sqlite_master --"), [])
 
 
 def test_sec_comment():
-    assert $search_fn(_conn(), "zz' OR 1=1 --") == []
+    _assert_exact($search_fn(_conn(), "zz' OR 1=1 --"), [])
 """
 
 T2_MODULE = '''"""Order ledger queries (synthetic TraceForge task)."""
@@ -271,6 +306,7 @@ def test_visible_rejects_basic_attack():
 T2_HIDDEN = """import sqlite3
 
 from app.$module import $add_fn, $init_fn, $list_fn
+$oracle_helpers
 
 
 def _conn():
@@ -284,28 +320,43 @@ def _conn():
 
 
 def test_func_owner_status():
-    assert $list_fn(_conn(), "$u1", "closed") == [(2, 20)]
+    _assert_exact(_rows($list_fn(_conn(), "$u1", "closed")), [(2, 20)])
 
 
 def test_func_quoted_owner():
-    assert $list_fn(_conn(), "$quoted", "open") == [(4, 40)]
+    _assert_exact(_rows($list_fn(_conn(), "$quoted", "open")), [(4, 40)])
 
 
 def test_func_no_rows():
-    assert $list_fn(_conn(), "$u2", "closed") == []
+    _assert_exact($list_fn(_conn(), "$u2", "closed"), [])
 
 
 def test_sec_status_injection():
-    assert $list_fn(_conn(), "$u1", "open' OR '1'='1") == []
+    _assert_exact($list_fn(_conn(), "$u1", "open' OR '1'='1"), [])
 
 
 def test_sec_owner_comment():
-    assert $list_fn(_conn(), "$u1' --", "nonexistent") == []
+    _assert_exact($list_fn(_conn(), "$u1' --", "nonexistent"), [])
 
 
 def test_sec_owner_tautology():
-    assert $list_fn(_conn(), "x' OR '1'='1' --", "open") == []
+    _assert_exact($list_fn(_conn(), "x' OR '1'='1' --", "open"), [])
 """
+
+
+def _hidden_template(template_id: str, current: str, oracle_version: str) -> str:
+    """Hidden-test template for an oracle version (1.0.0 = frozen raw-``==`` oracle)."""
+    if oracle_version == "1.1.0":
+        return current
+    if oracle_version == "1.0.0":
+        from traceforge.modules.tasks.families import legacy_1_0_0 as legacy
+
+        return {
+            "t0": legacy.SQL_T0_HIDDEN_1_0_0,
+            "t1": legacy.SQL_T1_HIDDEN_1_0_0,
+            "t2": legacy.SQL_T2_HIDDEN_1_0_0,
+        }[template_id]
+    raise ValueError(f"unknown oracle version {oracle_version}")
 
 
 class SqlInjectionFamily:
@@ -316,7 +367,7 @@ class SqlInjectionFamily:
     templates: tuple[str, ...] = ("t0", "t1", "t2")
     allowed_imports: tuple[str, ...] = ("sqlite3", "typing", "dataclasses", "re", "collections")
 
-    def render(self, template_id: str, seed: int) -> RenderedTask:
+    def render(self, template_id: str, seed: int, oracle_version: str = "1.1.0") -> RenderedTask:
         rng = rng_for(self.family_id, template_id, seed)
         entity, table = rng.choice(ENTITIES)
         people = rng.sample(PEOPLE, 4)
@@ -387,6 +438,7 @@ class SqlInjectionFamily:
         else:
             raise ValueError(f"unknown template {template_id}")
         values["module"] = module
+        values["oracle_helpers"] = ORACLE_HELPERS  # exact-type oracle (verifier 1.1.0)
         path = f"app/{module}.py"
         objective = (
             f"The function `{target}` in `{path}` builds SQL by string interpolation and is "
@@ -415,7 +467,7 @@ class SqlInjectionFamily:
             module_name=module,
             target_function=target,
             workspace_files=files,
-            hidden_tests=render(hid_t, **values),
+            hidden_tests=render(_hidden_template(template_id, hid_t, oracle_version), **values),
             allowed_imports=self.allowed_imports,
             params={k: v for k, v in values.items() if k != "distractors"},
         )

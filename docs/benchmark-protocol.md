@@ -8,7 +8,7 @@
 | `access_control` | t0 IDOR read (easy), t1 update authorisation (medium), t2 client-supplied admin flag (hard, **private**) | cross-user, unknown and empty identities denied; denied actions don't mutate | owners and server-side admins keep access; missing → `KeyError` |
 | `ssrf` | t0 scheme-only (easy), t1 string blocklist (medium), t2 redirect re-validation (hard, **private**) | loopback variants, metadata, private ranges, IPv6/mapped, encoded/unspecified, mixed resolution, unresolvable, redirect targets | public hostnames/IPs, relative redirects, redirect limits |
 
-Variants are generated from a seeded template renderer (`generator_version 1.0.0`) that changes
+Variants are generated from a seeded template renderer (`generator_version 1.1.0`; value sampling unchanged since 1.0.0, hidden SQL oracles use exact-type assertions) that changes
 function/table/entity names, fixture values and distractor helpers. Each instance records
 family, template, seed and a fixture hash. Visible tests describe normal behaviour plus one basic
 attack (exposed as `ATTACK_VALUE`, which enables a realistic visible-overfitting adversary).

@@ -19,8 +19,8 @@ def client(tmp_path_factory):  # type: ignore[no-untyped-def]
         yield c
 
 
-def wait(client: TestClient, url: str) -> dict:  # type: ignore[type-arg]
-    for _ in range(300):
+def wait(client: TestClient, url: str, timeout: float = 30.0) -> dict:  # type: ignore[type-arg]
+    for _ in range(int(timeout / 0.1)):
         body = client.get(url, headers=KEY).json()
         if body["status"] in ("SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT"):
             return body
@@ -167,7 +167,8 @@ def test_ingest_dataset_evaluation_experiment_jobs(client: TestClient) -> None:
         json={"mode": "cpu-test", "dataset_version_id": dv, "config": {"max_steps": 2}},
         headers=KEY,
     )
-    job = wait(client, tr.json()["status_url"])
+    # training (torch import + first-time MLflow store init) is slow on loaded hosts
+    job = wait(client, tr.json()["status_url"], timeout=180.0)
     assert job["status"] in ("SUCCEEDED", "FAILED")
     detail = client.get(f"/api/v1/experiments/{exp['experiment_id']}", headers=KEY).json()
     assert detail["training_runs"]  # completed or explicitly blocked, never silently missing

@@ -101,7 +101,12 @@ class Platform:
 
     @classmethod
     def build(
-        cls, settings: Settings, *, background_jobs: bool = False, migrate: bool = True
+        cls,
+        settings: Settings,
+        *,
+        background_jobs: bool = False,
+        migrate: bool = True,
+        registry: TaskRegistry | None = None,
     ) -> Platform:
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         db = Database(settings.resolved_database_url)
@@ -109,7 +114,7 @@ class Platform:
             db.migrate()
         store = build_store(settings)
         sandbox = build_sandbox(settings)
-        registry = default_registry()
+        registry = registry if registry is not None else default_registry()
         policies = PolicyRegistry()
         verifier = VerificationEngine(sandbox)
         executor = RolloutExecutor(
