@@ -20,6 +20,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from traceforge.contracts.common import CapabilityUnavailable, sha256_bytes, sha256_json
+from traceforge.modules.training.device import (
+    DEVICE_PATTERN,
+    PRECISION_PATTERN,
+    DeviceInfo,
+    autocast_context,
+    host_environment,
+    resolve_device,
+)
 from traceforge.modules.training.sft.formatting import render_plain
 
 IGNORE_INDEX = -100
@@ -53,10 +61,27 @@ class SFTConfig(BaseModel):
     lora: LoraSettings = LoraSettings()
     resume_from: str | None = None
     allow_download: bool = False
+    # None = "cpu" in cpu-test mode (keeps it a lightweight integration check) and "auto" in sft.
+    device: str | None = Field(default=None, pattern=DEVICE_PATTERN)
+    precision: str = Field(default="auto", pattern=PRECISION_PATTERN)
+
+    @property
+    def effective_device(self) -> str:
+        if self.device is not None:
+            return self.device
+        return "cpu" if self.mode == "cpu-test" else "auto"
 
     @property
     def config_hash(self) -> str:
-        return sha256_json(self.model_dump(mode="json"))
+        # Fields added in v0.2 are hashed only when set, so v0.1 config hashes stay stable.
+        data = self.model_dump(mode="json")
+        for key, default in V02_FIELD_DEFAULTS.items():
+            if data.get(key) == default:
+                data.pop(key, None)
+        return sha256_json(data)
+
+
+V02_FIELD_DEFAULTS: dict[str, object] = {"device": None, "precision": "auto"}
 
 
 def require_ml() -> None:
@@ -212,7 +237,7 @@ def _batches(
     order = list(range(len(examples)))
     random.Random(seed).shuffle(order)  # noqa: S311 - data order, not security
     out = []
-    for i in range(0, len(order), size):
+    for i in range(0, len(order), size):  # tensors are created on CPU; moved per step
         chunk = [examples[j] for j in order[i : i + size]]
         width = max(len(ids) for ids, _ in chunk)
         ids = torch.full((len(chunk), width), pad, dtype=torch.long)
@@ -226,6 +251,16 @@ def _batches(
     return out
 
 
+def to_device(batch: tuple[Any, Any, Any], device: DeviceInfo) -> tuple[Any, Any, Any]:
+    """Move (input_ids, labels, attention_mask) to the selected device."""
+    ids, labels, attn = batch
+    return (
+        ids.to(device.device, non_blocking=device.is_cuda),
+        labels.to(device.device, non_blocking=device.is_cuda),
+        attn.to(device.device, non_blocking=device.is_cuda),
+    )
+
+
 def run_sft(
     config: SFTConfig, train_rows: list[dict[str, Any]], val_rows: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -237,8 +272,12 @@ def run_sft(
         raise CapabilityUnavailable(
             "training split is empty; build a dataset with verified successes first"
         )
+    device = resolve_device(config.effective_device, config.precision)
     torch.manual_seed(config.seed)
+    if device.is_cuda:
+        torch.cuda.manual_seed_all(config.seed)
     model, tok = _load_model(config)
+    model = model.to(device.device)
     pad = tok.pad_token_id if tok.pad_token_id is not None else 0
 
     dropped = {"train": 0, "validation": 0}
@@ -267,32 +306,47 @@ def run_sft(
     start_step = 0
     out_dir = Path(config.output_dir)
     if config.resume_from:
-        state = torch.load(Path(config.resume_from) / "trainer_state.pt", weights_only=True)
+        state = torch.load(
+            Path(config.resume_from) / "trainer_state.pt",
+            weights_only=True,
+            map_location=device.device,
+        )
         model.load_state_dict(state["model"])
         optimizer.load_state_dict(state["optimizer"])
         start_step = int(state["step"])
+    scaler = torch.amp.GradScaler("cuda") if device.precision == "fp16" else None
     losses: list[float] = []
     step = start_step
     model.train()
     t0 = time.perf_counter()
     for epoch in range(config.epochs):
-        for ids, labels, attn in _batches(train, config.batch_size, pad, config.seed + epoch):
+        for batch in _batches(train, config.batch_size, pad, config.seed + epoch):
             if step >= config.max_steps:
                 break
-            loss = model(input_ids=ids, attention_mask=attn, labels=labels).loss
-            loss.backward()
-            optimizer.step()
+            ids, labels, attn = to_device(batch, device)
+            with autocast_context(device, torch):
+                loss = model(input_ids=ids, attention_mask=attn, labels=labels).loss
+            if scaler is not None:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
             optimizer.zero_grad()
-            losses.append(float(loss.detach()))
+            losses.append(float(loss.detach().float().cpu()))
             step += 1
     val_loss = None
     if val:
         model.eval()
+        vals = []
         with torch.no_grad():
-            vals = [
-                float(model(input_ids=i, attention_mask=a, labels=lbl).loss)
-                for i, lbl, a in _batches(val, config.batch_size, pad, 0)
-            ]
+            for batch in _batches(val, config.batch_size, pad, 0):
+                i, lbl, a = to_device(batch, device)
+                with autocast_context(device, torch):
+                    vals.append(
+                        float(model(input_ids=i, attention_mask=a, labels=lbl).loss.float().cpu())
+                    )
         val_loss = sum(vals) / len(vals)
     ckpt_dir = out_dir / f"step-{step}"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -318,6 +372,8 @@ def run_sft(
         "checkpoint": str(state_path),
         "checkpoint_sha256": sha256_bytes(state_path.read_bytes()),
         "torch_version": torch.__version__,
+        "device": device.as_dict(),
+        "environment": host_environment(),
     }
     (ckpt_dir / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return meta

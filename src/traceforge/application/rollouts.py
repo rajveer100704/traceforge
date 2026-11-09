@@ -166,5 +166,26 @@ class RolloutExecutor:
                 "policy": provider_config.policy if provider_config.kind == "demo" else None,
                 "demo_provider": provider_config.kind == "demo",
                 "protected_tests": episode.protected_tests,
+                "seed": provider_config.seed,
+                **generation_stats(trajectory),
             },
         )
+
+
+def generation_stats(trajectory: Trajectory) -> dict[str, int | float]:
+    """Token usage and model latency recorded on assistant steps (zero for the demo provider)."""
+    prompt = completion = 0
+    seconds = 0.0
+    for step in trajectory.steps:
+        if step.role.value != "assistant":
+            continue
+        if step.token_usage is not None:
+            prompt += step.token_usage.prompt_tokens
+            completion += step.token_usage.completion_tokens
+        if step.completed_at is not None:
+            seconds += (step.completed_at - step.started_at).total_seconds()
+    return {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "generation_seconds": round(seconds, 6),
+    }

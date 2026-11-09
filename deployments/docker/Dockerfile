@@ -8,7 +8,16 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
-RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin traceforge
+# Apply Debian security updates published after the base image was built (e.g. zlib1g
+# CVE-2026-85091), then remove setuid/setgid bits (mount, su, passwd, ...): the service never
+# needs privilege elevation, which removes the local-privilege-escalation path behind the
+# util-linux/shadow CVEs. See docs/security/container-vulnerabilities.md.
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /root/.cache \
+ && useradd --uid 10001 --create-home --shell /usr/sbin/nologin traceforge \
+ && find / -xdev -perm /6000 -type f -exec chmod a-s {} +
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /app/.venv /app/.venv
 COPY --chown=10001:10001 examples ./examples

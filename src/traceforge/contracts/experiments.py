@@ -66,6 +66,28 @@ class RolloutSummary(StrictModel):
         return self.verification.verdict
 
 
+class TrainingLineage(FrozenModel):
+    """What the evaluated model was trained on. Checked against the evaluated tasks before an
+    official benchmark run starts (task id, fixture and private-template overlap)."""
+
+    dataset_version_ids: tuple[str, ...] = ()
+    training_run_ids: tuple[str, ...] = ()
+    task_ids: tuple[str, ...] = ()
+    description: str = ""
+
+    @property
+    def declared(self) -> bool:
+        return bool(self.dataset_version_ids or self.training_run_ids or self.task_ids)
+
+
+BENCHMARK_V02_DEFAULTS: dict[str, object] = {
+    "seeds": [],
+    "run_mode": "official",
+    "training_lineage": TrainingLineage().model_dump(mode="json"),
+    "reward_thresholds": [0.1, 0.25, 0.5, 0.75, 0.9],
+}
+
+
 class BenchmarkConfig(FrozenModel):
     name: str = "demo-benchmark"
     splits: tuple[Split, ...] = (Split.PUBLIC_TEST, Split.PRIVATE_TEST)
@@ -78,10 +100,32 @@ class BenchmarkConfig(FrozenModel):
     seed: int = 0
     bootstrap_samples: int = Field(default=2000, ge=100)
     confidence: float = Field(default=0.95, gt=0.5, lt=1.0)
+    # v0.2 -------------------------------------------------------------------------------------
+    # Repeated-seed execution: every task runs once per seed (provider seed = that seed).
+    # Empty = a single episode per task with provider.seed (v0.1 behaviour).
+    seeds: tuple[int, ...] = ()
+    # "official" refuses to run when leakage/lineage checks fail. "diagnostic" runs anyway and
+    # marks every artifact as non-official; it must be selected explicitly.
+    run_mode: str = Field(default="official", pattern="^(official|diagnostic)$")
+    training_lineage: TrainingLineage = TrainingLineage()
+    reward_thresholds: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 0.9)
+
+    @property
+    def effective_seeds(self) -> tuple[int, ...]:
+        return self.seeds or (self.provider.seed if self.provider.seed is not None else 0,)
+
+    @property
+    def official(self) -> bool:
+        return self.run_mode == "official"
 
     @property
     def config_hash(self) -> str:
-        return sha256_json(self.model_dump(mode="json"))
+        # v0.2 fields are hashed only when changed from their defaults, so v0.1 hashes are stable.
+        data = self.model_dump(mode="json")
+        for key, default in BENCHMARK_V02_DEFAULTS.items():
+            if data.get(key) == default:
+                data.pop(key, None)
+        return sha256_json(data)
 
 
 class ExperimentSpec(FrozenModel):

@@ -19,7 +19,7 @@
       "verified_success_fraction": 0.30864197530864196,
       "misleading_claimed_success": 51,
       "misleading_fraction": 0.6296296296296297,
-      "dataset_version": "v-0d079251223a",
+      "dataset_version": "v-9e0b0c435561",
       "rejection_summary": {}
     },
     "d2_schema_valid": {
@@ -31,7 +31,7 @@
       "verified_success_fraction": 0.3116883116883117,
       "misleading_claimed_success": 50,
       "misleading_fraction": 0.6493506493506493,
-      "dataset_version": "v-28bec391c6dd",
+      "dataset_version": "v-1fcc6488a51c",
       "rejection_summary": {
         "excluded_by_d2_schema_valid:duplicate": 1,
         "excluded_by_d2_schema_valid:rejected": 3
@@ -46,7 +46,7 @@
       "verified_success_fraction": 1.0,
       "misleading_claimed_success": 0,
       "misleading_fraction": 0.0,
-      "dataset_version": "v-b0661538379e",
+      "dataset_version": "v-a0fffb159d79",
       "rejection_summary": {
         "excluded_by_d3_verified_success:accepted": 53,
         "excluded_by_d3_verified_success:duplicate": 1,
@@ -62,7 +62,7 @@
       "verified_success_fraction": 0.5,
       "misleading_claimed_success": 24,
       "misleading_fraction": 0.5,
-      "dataset_version": "v-d576192b4f17",
+      "dataset_version": "v-8ce75ca9058f",
       "rejection_summary": {
         "excluded_by_d4_verified_plus_informative:accepted": 29,
         "excluded_by_d4_verified_plus_informative:duplicate": 1,
@@ -70,5 +70,10 @@
       }
     }
   },
-  "downstream_sft": "NOT EXECUTED: downstream SFT comparison across D1\u2013D4 requires a real base model; only cpu-test integration is available here (sft mode: available on CPU only (no CUDA); practical only for tiny models)"
+  "downstream_sft": "NOT EXECUTED: downstream SFT comparison across D1\u2013D4 requires a real base model; see Experiment F (sft mode: available on CPU only (no CUDA); practical only for tiny models)",
+  "evidence": {
+    "kind": "scripted_agent_pipeline_validation",
+    "learned_model_evidence": false,
+    "label": "SCRIPTED-AGENT PIPELINE VALIDATION \u2014 deterministic demo_provider policies with ground-truth labels by construction; not evidence about any learned model."
+  }
 }

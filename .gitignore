@@ -25,6 +25,7 @@ Thumbs.db
 *.key
 # Runtime data, artifacts, models
 .traceforge/
+.traceforge-*/
 mlruns/
 checkpoints/
 *.safetensors

@@ -325,17 +325,25 @@ ADVERSARIAL_POLICIES = tuple(
 )
 
 
+def all_policies() -> dict[str, tuple[PolicyInfo, Callable[[], Policy]]]:
+    """Development policies plus the held-out attack set (imported lazily; see Experiment H)."""
+    from traceforge.modules.agents.providers.heldout_attacks import HELDOUT_POLICIES
+
+    return {**POLICIES, **HELDOUT_POLICIES}
+
+
 class ScriptedDemoProvider:
     kind = "demo"
     trusted = True
     model_revision = "scripted-1"
 
     def __init__(self, policy: str = "reference") -> None:
-        if policy not in POLICIES:
-            raise ValueError(f"unknown demo policy '{policy}'. Known: {sorted(POLICIES)}")
+        table = all_policies()
+        if policy not in table:
+            raise ValueError(f"unknown demo policy '{policy}'. Known: {sorted(table)}")
         self.policy_name = policy
         self.model_id = f"demo_provider/{policy}"
-        self._gen: Policy = POLICIES[policy][1]()
+        self._gen: Policy = table[policy][1]()
         self._started = False
         self._calls = 0
 

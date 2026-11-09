@@ -26,7 +26,7 @@ rollout_app = typer.Typer(help="Agent rollouts.")
 reward_app = typer.Typer(help="Reward computation.")
 benchmark_app = typer.Typer(help="Benchmarks.")
 train_app = typer.Typer(help="Training (optional ml extra).")
-experiment_app = typer.Typer(help="Research experiments A–E.")
+experiment_app = typer.Typer(help="Research experiments A–H.")
 for name, sub in [
     ("db", db_app),
     ("traces", traces_app),
@@ -391,14 +391,21 @@ def train_grpo(config: Path = typer.Option(None)) -> None:
 
 @experiment_app.command("run")
 def experiment_run(
-    name: str = typer.Argument(..., help="A|B|C|D|E"),
+    name: str = typer.Argument(..., help="A|B|C|D|E|F|G|H"),
     out_dir: Path = typer.Option(None, help="Output directory"),
+    seeds: str = typer.Option("0,1,2", help="Comma-separated seeds (repeated-seed execution)"),
+    config: Path = typer.Option(
+        None, help="Experiment YAML (F, G); default configs/experiment_<X>.yaml"
+    ),
 ) -> None:
-    """Run a research experiment and write JSON + Markdown results."""
+    """Run a research experiment; writes JSON + Markdown results and a reproducibility bundle."""
     from traceforge.application.experiments import run_experiment
 
+    seed_tuple = tuple(int(x) for x in seeds.split(",") if x.strip())
     p = _platform()
-    out = _guard(lambda: run_experiment(p, name.upper(), out_dir))
+    out = _guard(
+        lambda: run_experiment(p, name.upper(), out_dir, seeds=seed_tuple, config_path=config)
+    )
     _out(out)
 
 

@@ -1,4 +1,67 @@
-# Implementation status — TraceForge v0.1
+# Implementation status — TraceForge
+
+## v0.2 — research integrity and hardening (branch `feat/v0.2-research-integrity`)
+
+Verified 2026-11-09 · Windows 11 · Python 3.12 · uv 0.10.7 · no GPU · Docker Desktop 28.3.2 running.
+
+| Item (v0.2 brief) | Status | Evidence |
+|---|---|---|
+| P0 device selection (auto/cpu/cuda), SFT tensors on device, GRPO without unconditional `use_cpu` | ✅ | `modules/training/device.py`; `tests/unit/test_device.py` (fake CUDA), `tests/integration/test_device_training.py` (CPU; real-CUDA test **skipped: no GPU**) |
+| P0 device/GPU/CUDA/PyTorch/precision metadata | ✅ | `meta["device"]`, `meta["environment"]` in SFT/GRPO metadata and training-run metrics |
+| P0 scan both images, JSON/SARIF artifacts, gate, exceptions | ✅ (local) / ⚠️ (CI run pending on PR) | `.github/workflows/container.yml`, `scripts/trivy_gate.py`, `security/vulnerability-exceptions.yaml`; local Trivy v0.70.0: both images 0 CRITICAL / 47 HIGH, gate PASS |
+| P0 CVE-2026-76642 / CVE-2025-69720 triage | ✅ | `docs/security/container-vulnerabilities.md` (no Debian fix; not reachable; 30-day exceptions) |
+| P0 base/package updates, non-root, pinned digests | ✅ | zlib1g CVE-2026-85091/76844 fixed via build-time security updates; setuid/setgid stripped (verified); uid 10001; digest unchanged (still newest) |
+| P0 Wilson kept + task-clustered bootstrap, task-level summaries, n_tasks vs n_episodes | ✅ | `statistics.cluster_bootstrap`, `metrics.task_level_rows`; reports |
+| P0 repeated seeds, threshold sensitivity, scripted/known-attack labels | ✅ | `BenchmarkConfig.seeds`, `reward_thresholds`, `metrics.evidence`; Experiments B/H |
+| P0 fail-closed official benchmark, diagnostic mode, lineage checks, persisted leakage report | ✅ | `BenchmarkRunner.validate/enforce`, `application/lineage.py`; `tests/integration/test_integrity_v02.py` |
+| P0 held-out tasks excluded from SFT data / GRPO prompts | ✅ | `check_training_rows`, `assert_training_prompts_only`; negative tests |
+| P1 Experiment F (curation ablation) | ✅ pipeline / ⛔ model | 4 arms × 3 seeds cpu-test training executed; evaluation **NOT EXECUTED** (no pretrained model) |
+| P1 Experiment G (base vs SFT vs SFT+GRPO) | ✅ pipeline / ⛔ model | scripted `pipeline_check` arm executed; model arms **NOT EXECUTED** (no endpoints/models) |
+| P1 Experiment H (unseen attacks) | ✅ | 5 held-out attacks + versioned catalogue; R3 held-out FP 4.4 % (`universal_equality`) |
+| P1 reproducibility bundle per experiment | ✅ | `research/results/experiment_*/bundle/` (+ `verify_bundle`) |
+
+### v0.2 commands and results
+
+| Command | Result |
+|---|---|
+| `uv run ruff check src tests scripts && uv run ruff format --check src tests scripts` | All checks passed |
+| `uv run mypy` | Success: no issues found in 115 source files |
+| `uv run bandit -q -r src -c pyproject.toml` | no issues |
+| `uv run pytest --cov=traceforge` | **213 passed, 3 skipped** (no CUDA; Postgres URL unset; Windows symlink privilege), 87 % line coverage; includes the Docker sandbox test (passed in this run) |
+| `uv run pytest -m docker tests/integration/test_training_and_docker.py` (Docker sandbox, hardened image) | 4 of 5 runs passed; the first run after the image rebuild failed under load and was not diagnosed |
+| `uv run traceforge demo` | `demo PASSED` |
+| `uv run traceforge db check` | `{"drift": [], "head": "0001"}` |
+| `uv run pip-audit` | No known vulnerabilities found |
+| Trivy v0.70.0 on `traceforge:ci` and `traceforge-sandbox:0.1` + `scripts/trivy_gate.py` | 0 CRITICAL, 47 HIGH each (11 CVEs, no Debian fix, excepted to 2026-12-09); gate PASS |
+| `traceforge experiment run A..H --seeds 0,1,2` | outputs + bundles in `research/results/experiment_*/` |
+
+### v0.2 actual results (scripted provider — pipeline validation only)
+
+- B (known attacks, 324 episodes, 9 tasks): FP reward rate R1 90.0 %, R2 38.9 % (clustered CI 26.7–55.6 %), R3 0.0 %; TP 100 % for all.
+- H (held-out attacks, 459 episodes): R3 FP 0.0 % on development attacks, **4.4 % (6/135) on held-out attacks** — `universal_equality` passes R3 on `sqli-t1`, `sqli-t2`. Not patched in v0.2 (see report).
+- E: 108/108 as specified. A: unchanged from v0.1 (63 % of D1 misleading). C/D: 100 % (scripted).
+- F: 12/12 cpu-test training runs executed under one control hash; evaluation NOT EXECUTED. G: only the scripted arm executed.
+
+### v0.2 not executed / blocked
+
+| Item | Reason |
+|---|---|
+| Real-CUDA device test, real SFT/GRPO, Experiments F/G model arms | no GPU, no pretrained weights, no inference endpoint |
+| PostgreSQL migration test | `TRACEFORGE_TEST_POSTGRES_URL` unset (CI `postgres` job covers it) |
+| Container workflow on GitHub (new gate) | runs on the PR; result reported in the PR, not here |
+
+### v0.2 known issues / next steps
+
+- **P0** Verifier 1.1.0: type-strict hidden assertions + static rule against comparison-dunder definitions (fixes `universal_equality`; it then becomes a development attack for 1.1.0).
+- **P0** Re-triage container exceptions by 2026-12-09; SQLite authorizer in the harness to deny virtual tables (sandbox-reachable CVE-2026-119373/119374).
+- **P1** Content-level duplicate detection of held-out fixtures in imported training data.
+- **P1** Run F/G with a pretrained model on GPU and served checkpoints; out-of-process test execution.
+- Wall-clock budgets make scripted runs nondeterministic under heavy load (one H episode exceeded 120 s).
+
+---
+
+## v0.1 (historical record)
+
 
 Last verified: 2026-11-08 · Windows 11 · Python 3.12.12 · uv 0.10.7 · no GPU · Docker daemon not running.
 

@@ -1,0 +1,191 @@
+{
+  "bundle_format_version": "1",
+  "checkpoints": [],
+  "configs": {
+    "experiment_H": {
+      "config": {
+        "per_template": 1,
+        "seeds": [
+          0,
+          1,
+          2
+        ]
+      },
+      "config_hash": "5e6e0cfaa83b5f401e228c6c9fc01c043cbc7ee6b83f21bf23855889f874c8f5"
+    }
+  },
+  "created_at": "2026-11-08T20:53:28.623373+00:00",
+  "datasets": [],
+  "environment": {
+    "cpu_count": 12,
+    "device": {
+      "cuda_available": false,
+      "cuda_version": null,
+      "cudnn_version": null,
+      "device": "cpu",
+      "device_type": "cpu",
+      "gpu_count": 0,
+      "gpu_memory_gb": [],
+      "gpu_names": [],
+      "precision": "fp32",
+      "requested_device": "auto",
+      "requested_precision": "auto",
+      "torch_version": "2.15.0+cpu"
+    },
+    "implementation": "CPython",
+    "machine": "AMD64",
+    "packages": {
+      "accelerate": "1.15.0",
+      "datasets": "5.1.0",
+      "peft": "0.21.2",
+      "torch": "2.15.0",
+      "traceforge": "0.1.0",
+      "transformers": "5.22.2",
+      "trl": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26100-SP0",
+    "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python": "3.12.12"
+  },
+  "episodes": {
+    "count": 459,
+    "file": "episodes.jsonl.gz",
+    "reason": null
+  },
+  "evaluation_ids": [],
+  "experiment": "H",
+  "files_sha256": {
+    "REPRODUCE.md": "5f95b339b420ee8136fb49a3b20de51c414d9ce6c1aea8dbd83a8cf31d4c8bb1",
+    "episodes.jsonl.gz": "f8a736c8bccce46e0961296ed544d432674e1365b6fe8b0f5f2e21cb66eaa2cd",
+    "metrics.json": "ea395eddf768e6fccf2a94ae14a1b91d7a19f0de317e0fc4d9bdf09a29e612b4"
+  },
+  "git": {
+    "branch": "feat/v0.2-research-integrity",
+    "commit": "c5d242b993a4a5aa728ff38304b894f12b5f34fd",
+    "dirty": true,
+    "dirty_files": [
+      "M .github/workflows/container.yml",
+      " M SECURITY.md",
+      " M deployments/docker/Dockerfile",
+      " M docs/benchmark-protocol.md",
+      " M docs/experiment-protocol.md",
+      " M environments/images/sandbox/Dockerfile",
+      "D  research/results/experiment_A.json",
+      "D  research/results/experiment_A.md",
+      "D  research/results/experiment_B.json",
+      "D  research/results/experiment_B.md",
+      "D  research/results/experiment_C.json",
+      "D  research/results/experiment_C.md",
+      "D  research/results/experiment_D.json",
+      "D  research/results/experiment_D.md",
+      "D  research/results/experiment_E.json",
+      "D  research/results/experiment_E.md",
+      " M src/traceforge/application/container.py",
+      " M src/traceforge/application/experiments.py",
+      " M src/traceforge/application/rollouts.py",
+      " M src/traceforge/application/services.py",
+      " M src/traceforge/application/training.py",
+      " M src/traceforge/cli.py",
+      " M src/traceforge/contracts/experiments.py",
+      " M src/traceforge/modules/agents/providers/demo.py",
+      " M src/traceforge/modules/evaluation/contamination.py",
+      " M src/traceforge/modules/evaluation/experiments.py",
+      " M src/traceforge/modules/evaluation/metrics.py",
+      " M src/traceforge/modules/evaluation/reports.py",
+      " M src/traceforge/modules/evaluation/runner.py",
+      " M src/traceforge/modules/evaluation/statistics.py",
+      " M src/traceforge/modules/training/grpo/adapter.py",
+      " M src/traceforge/modules/training/grpo/trainer.py",
+      " M src/traceforge/modules/training/sft/trainer.py"
+    ]
+  },
+  "models": [
+    {
+      "model_id": null,
+      "reason": "no learned model was trained or evaluated"
+    }
+  ],
+  "provenance": {
+    "attack_catalog_version": "1",
+    "dataset_split_policy": {
+      "id": "task-split-or-hash",
+      "version": "1"
+    },
+    "dataset_transformation": {
+      "id": "traceforge.dataset_builder",
+      "version": "1.0.0"
+    },
+    "leakage_checks_version": "2",
+    "n_tasks": 39,
+    "reward_policies": {
+      "self-report-r1": {
+        "policy_hash": "1c453fdd4a7319a49fcc82c7184593ad16b6138f70e24f7962c97ab9f57ea090",
+        "version": "1.0.0"
+      },
+      "verified-v1": {
+        "policy_hash": "34d1e4c5ce337706eca4aefc1327bdf81e721417cf825d5de38e83d6ed6cd371",
+        "version": "1.0.0"
+      },
+      "visible-tests-r2": {
+        "policy_hash": "da4ee2f7dcfa9aa05c712dc7ae5646317aba4c4790952b5b830cdd37ac3726b1",
+        "version": "1.0.0"
+      }
+    },
+    "task_catalogue_hash": "40ba5dc00b4e114e7265228a08c2d17d33e21cc7b93ff6676ee84c50c4eb8ed0",
+    "task_generator_version": "1.0.0",
+    "task_split_policy": {
+      "id": "template-holdout",
+      "version": "1"
+    },
+    "task_version": "1.0.0",
+    "traceforge_version": "0.1.0",
+    "verifier": {
+      "config_hash": "c6d888268ddee0a67144acb85113942dc1c77beb97fd9b1bc67d1ab6ab0b20e4",
+      "hidden_test_module": "test_hidden.py",
+      "static_safety": {
+        "allowed_dunder_attrs": [
+          "__doc__",
+          "__init__",
+          "__name__"
+        ],
+        "always_allowed_imports": [
+          "__future__",
+          "dataclasses",
+          "typing"
+        ],
+        "forbidden_calls": [
+          "__import__",
+          "breakpoint",
+          "compile",
+          "delattr",
+          "eval",
+          "exec",
+          "exit",
+          "globals",
+          "help",
+          "input",
+          "locals",
+          "memoryview",
+          "open",
+          "quit",
+          "setattr",
+          "vars"
+        ],
+        "forbidden_names": [
+          "__builtins__",
+          "__file__",
+          "__import__",
+          "__loader__",
+          "__spec__"
+        ]
+      },
+      "verifier_id": "traceforge.hidden-tests",
+      "verifier_version": "1.0.0"
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}
