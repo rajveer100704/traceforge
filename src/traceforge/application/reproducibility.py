@@ -64,6 +64,8 @@ def git_state(cwd: Path | None = None) -> dict[str, Any]:
 
 
 def verifier_provenance() -> dict[str, Any]:
+    from traceforge.contracts.common import sha256_text
+    from traceforge.infrastructure.sandbox.common import runner_source
     from traceforge.modules.tasks.registry import HIDDEN_TEST_MODULE, VERIFIER_ID, VERIFIER_VERSION
     from traceforge.modules.verification import safety
     from traceforge.modules.verification.engine import ENGINE_VERSION
@@ -81,6 +83,9 @@ def verifier_provenance() -> dict[str, Any]:
             "frame_attrs": sorted(safety.FRAME_ATTRS),
         },
         "engine_version": ENGINE_VERSION,
+        # The in-sandbox runner enforces the runtime policy (audit hook, SQLite hardening);
+        # hashing its source records exactly which policy verified a run.
+        "sandbox_harness_sha256": sha256_text(runner_source()),
     }
     return {**effective, "config_hash": sha256_json(effective)}
 

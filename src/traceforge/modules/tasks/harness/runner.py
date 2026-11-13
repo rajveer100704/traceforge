@@ -10,6 +10,13 @@ Defence-in-depth (NOT a security boundary on its own):
   violations and reported to the host verifier.
 * The result line is framed with a nonce taken from the environment and removed from
   ``os.environ`` before candidate code is imported.
+* Every SQLite connection is hardened as it is created (audit event ``sqlite3.connect/handle``):
+  no attached databases (blocks ``ATTACH`` and ``VACUUM INTO``, which otherwise reach files
+  without any Python ``open`` event), defensive mode (read-only shadow tables and schema), no
+  virtual tables, no extension loading, a PRAGMA allow-list, parser/resource limits, a heap
+  limit and a VM-step budget. This is defence in depth: code running in this process can undo
+  per-connection settings. The sandbox image's SQLite build (no FTS5/FTS3/R-Tree/session,
+  compile-time limits) is the stronger layer; see docs/security/container-vulnerabilities.md.
 """
 
 import importlib.util
@@ -74,11 +81,124 @@ BLOCKED_IMPORTS = {
 }
 WRITE_FLAGS = getattr(os, "O_WRONLY", 1) | getattr(os, "O_RDWR", 2) | getattr(os, "O_CREAT", 64)
 
+SQLITE_POLICY_VERSION = "1"
+SQLITE_LIMITS = (
+    ("SQLITE_LIMIT_ATTACHED", 0),  # no ATTACH / VACUUM INTO: no file-backed databases via SQL
+    ("SQLITE_LIMIT_SQL_LENGTH", 100_000),
+    ("SQLITE_LIMIT_EXPR_DEPTH", 100),
+    ("SQLITE_LIMIT_COMPOUND_SELECT", 50),
+    ("SQLITE_LIMIT_LIKE_PATTERN_LENGTH", 1_000),
+    ("SQLITE_LIMIT_VARIABLE_NUMBER", 999),
+    ("SQLITE_LIMIT_TRIGGER_DEPTH", 10),
+    ("SQLITE_LIMIT_LENGTH", 10_000_000),
+)
+SQLITE_DBCONFIG = (
+    ("SQLITE_DBCONFIG_DEFENSIVE", True),
+    ("SQLITE_DBCONFIG_TRUSTED_SCHEMA", False),
+    ("SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION", False),
+)
+SQLITE_HEAP_LIMIT_BYTES = 64 * 1024 * 1024  # process-wide; SQLite only ever lowers this limit
+SQLITE_PROGRESS_INTERVAL = 10_000
+SQLITE_MAX_VM_STEPS = 50_000_000  # per connection
+SQLITE_ALLOWED_PRAGMAS = frozenset(
+    {"table_info", "table_xinfo", "table_list", "index_list", "index_info", "index_xinfo"}
+)
+SQLITE_DENIED_FUNCTIONS = frozenset({"load_extension", "fts3_tokenizer"})
+
+
+def _harden_sqlite(conn, violations):
+    """Apply the SQLite policy to a new connection, or raise (the connection is then refused)."""
+    sqlite3 = sys.modules["sqlite3"]
+    deny_actions = {
+        sqlite3.SQLITE_ATTACH: "attach",
+        sqlite3.SQLITE_CREATE_VTABLE: "create_vtable",
+        sqlite3.SQLITE_DROP_VTABLE: "drop_vtable",
+    }
+
+    def record(detail):
+        if len(violations) < 100:
+            violations.append(detail)
+
+    def authorizer(action, arg1, arg2, _db, _trigger):
+        if action in deny_actions:
+            record("sqlite3.denied:" + deny_actions[action])
+            return sqlite3.SQLITE_DENY
+        # Allow-listed pragmas are read-only introspection; their argument is a table/index name.
+        if action == sqlite3.SQLITE_PRAGMA and str(arg1).lower() not in SQLITE_ALLOWED_PRAGMAS:
+            record("sqlite3.denied:pragma:" + str(arg1)[:40])
+            return sqlite3.SQLITE_DENY
+        if action == sqlite3.SQLITE_FUNCTION and str(arg2).lower() in SQLITE_DENIED_FUNCTIONS:
+            record("sqlite3.denied:function:" + str(arg2))
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    steps = {"n": 0}
+
+    def progress():
+        steps["n"] += SQLITE_PROGRESS_INTERVAL
+        if steps["n"] > SQLITE_MAX_VM_STEPS:
+            record("sqlite3.vm_step_limit")
+            return 1  # abort the statement
+        return 0
+
+    for name, enabled in SQLITE_DBCONFIG:
+        conn.setconfig(getattr(sqlite3, name), enabled)
+    for name, value in SQLITE_LIMITS:
+        conn.setlimit(getattr(sqlite3, name), value)
+    conn.execute(f"PRAGMA hard_heap_limit={SQLITE_HEAP_LIMIT_BYTES:d}")
+    conn.set_progress_handler(progress, SQLITE_PROGRESS_INTERVAL)
+    conn.set_authorizer(authorizer)
+
+
+def _install_sqlite_policy(violations):
+    """Route every ``connect`` through a connection class that hardens itself after init.
+
+    The ``sqlite3.connect/handle`` audit event fires before a connection is initialised, so the
+    hook cannot configure it; instead the hook refuses any connection whose exact type is not
+    this class (direct ``Connection(...)`` construction, other factories, subclasses).
+    """
+    import _sqlite3
+    import sqlite3
+    import sqlite3.dbapi2 as dbapi2
+
+    original_connect = _sqlite3.connect
+
+    class HardenedConnection(sqlite3.Connection):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            try:
+                _harden_sqlite(self, violations)
+            except Exception as exc:
+                if len(violations) < 100:
+                    violations.append("sqlite3.hardening_failed")
+                self.close()
+                raise PermissionError("sandbox policy denied: sqlite3 hardening failed") from exc
+
+    def connect(database, *args, **kwargs):
+        factory = kwargs.pop("factory", HardenedConnection)
+        if factory is not HardenedConnection:
+            if len(violations) < 100:
+                violations.append("sqlite3.denied:factory")
+            raise PermissionError("sandbox policy denied: sqlite3 connection factory")
+        return original_connect(database, *args, factory=HardenedConnection, **kwargs)
+
+    for module in (sqlite3, dbapi2, _sqlite3):
+        module.connect = connect
+    return HardenedConnection
+
 
 def _install_guard(violations):
     armed = {"on": False}
+    hardened_cls = _install_sqlite_policy(violations)
 
     def hook(event, args):
+        if event == "sqlite3.connect/handle":
+            # Always enforced (armed or not): no connection is ever handed out unhardened.
+            if type(args[0]) is not hardened_cls:
+                if len(violations) < 100:
+                    violations.append("sqlite3.unhardened_connection")
+                raise PermissionError("sandbox policy denied: unhardened sqlite3 connection")
+            return
         if not armed["on"]:
             return
         blocked = False

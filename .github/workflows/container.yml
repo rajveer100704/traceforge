@@ -28,11 +28,20 @@ jobs:
             suid="$(docker run --rm "$img" sh -c 'find / -xdev -perm /6000 -type f 2>/dev/null' || true)"
             if [ -n "$suid" ]; then echo "setuid/setgid binaries in $img:"; echo "$suid"; exit 1; fi
           done
+      - name: Sandbox ships the source-built SQLite (Trivy cannot see it)
+        run: |
+          docker run --rm traceforge-sandbox:0.1 python -c "import sqlite3, sys; \
+          v = sqlite3.sqlite_version; o = [r[0] for r in sqlite3.connect(':memory:').execute('PRAGMA compile_options')]; \
+          bad = [x for x in o if any(k in x for k in ('FTS3', 'FTS4', 'FTS5', 'RTREE', 'SESSION'))]; \
+          print(v, o); sys.exit(0 if v == '3.54.1' and not bad and 'MAX_ATTACHED=0' in o else 'unexpected SQLite build')"
+          if docker run --rm traceforge-sandbox:0.1 dpkg -s libsqlite3-0 >/dev/null 2>&1; then
+            echo "Debian libsqlite3-0 is still installed in the sandbox image"; exit 1
+          fi
       - name: Docker sandbox integration tests
         run: |
           curl -LsSf https://astral.sh/uv/0.10.7/install.sh | sh
           ~/.local/bin/uv sync --frozen
-          ~/.local/bin/uv run pytest -q -m docker tests/integration/test_training_and_docker.py
+          ~/.local/bin/uv run pytest -q -m docker tests/integration/test_training_and_docker.py tests/security/test_sandbox_security.py
       - name: Install Trivy
         uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
         with: {version: "${{ env.TRIVY_VERSION }}", cache: true}

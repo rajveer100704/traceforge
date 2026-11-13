@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Security
+- Sandbox image ships SQLite 3.54.1 built from verified upstream source without FTS3/4/5, R-Tree
+  and session, with compile-time limits (no attached databases). Debian `libsqlite3-0` (3.46.1;
+  CVE-2026-119373/119374/119379, no Debian fix) is removed from the sandbox image.
+- Harness SQLite policy for every connection (local and Docker sandboxes): it denies ATTACH,
+  VACUUM INTO, virtual tables, extension loading and non-allow-listed PRAGMAs; sets defensive
+  mode, parser/size limits, a heap limit and a VM-step budget; and refuses connections not made
+  through the hardened factory. This closes SQL-level bypasses of the "no file-backed database"
+  rule (ATTACH/VACUUM INTO created files without a Python `open` event). It is defence in depth;
+  residual risks are in `docs/security/container-vulnerabilities.md`.
+- `reverify` refuses to execute code from untrusted model providers in a trusted-code-only
+  (local) sandbox, matching the rollout and GRPO gates.
+- `verifier_provenance()` records the SHA-256 of the sandbox harness.
+- Container exceptions re-triaged on 2026-11-14: all 11 CVEs are still unfixed in Debian 13;
+  renewed to 2026-12-14, with the SQLite entries narrowed to the platform image.
+- gitleaks: exact-fingerprint ignore for synthetic placeholders in the redaction unit test,
+  which full-history scheduled scans flagged.
+
 ## Verifier 1.1.0 — universal-equality hardening (released in 0.2.0, 2026-11-09)
 
 ### Background: the 1.0.0 weakness
