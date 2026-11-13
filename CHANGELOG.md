@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## Unreleased
+
+### Added
+- `research/HISTORICAL_SHA256SUMS`: SHA-256 of every protected historical artifact (v0.2.0
+  experiment outputs and bundles, the v0.2 technical report, the frozen task-version 1.0.0
+  source), computed from the git objects at tag `v0.2.0` by `scripts/historical_manifest.py`.
+- `tests/integration/test_historical_integrity.py`: CI fails if a protected file changes,
+  disappears, becomes a symlink, or a historical result directory gains entries; all nine
+  bundles must verify; the manifest must equal the `v0.2.0` tag (CI fetches the tag).
+- `docs/baseline-v0.2.0.md` (baseline audit) and `docs/plans/v0.3-research-execution.md`.
+
+### Fixed
+- Documentation consistency: README lists experiments A–H; implementation status no longer
+  describes merged work as open branches; the 0.2.0 known-issues entry below is reworded.
+
 ### Security
 - Sandbox image ships SQLite 3.54.1 built from verified upstream source without FTS3/4/5, R-Tree
   and session, with compile-time limits (no attached databases). Sandboxed Python loads it
@@ -26,7 +41,6 @@
   reachable in either image.
 - gitleaks: exact-fingerprint ignore for synthetic placeholders in the redaction unit test,
   which full-history scheduled scans flagged.
-
 ## Verifier 1.1.0 — universal-equality hardening (released in 0.2.0, 2026-11-09)
 
 ### Background: the 1.0.0 weakness
@@ -127,11 +141,13 @@ by explicit version only, for re-verifying rollouts recorded against it.
 - `traceforge experiment run` accepts `F|G|H`, `--seeds` and `--config`.
 
 ### Known issues
-- Experiment H found that verifier 1.0.0 rewards the held-out `universal_equality` attack on two
-  SQL-injection templates (6/27 episodes; R3 held-out FP rate 4.4 %, 6/135). Not fixed in this
-  release, to keep the held-out measurement clean; proposed fix for verifier 1.1.0 in the report.
-  (Resolved before release: verifier 1.1.0, above, ships in 0.2.0 and rejects this attack. The
-  1.0.0 measurement and the technical report are kept unchanged as the historical record.)
+- Historical finding, resolved in this release: Experiment H found that verifier 1.0.0 rewards
+  the held-out `universal_equality` attack on two SQL-injection templates (6/27 episodes; R3
+  held-out FP rate 4.4 %, 6/135). The v0.2 research branch deliberately left 1.0.0 unpatched to
+  keep that measurement clean. Verifier 1.1.0 (section above) ships in 0.2.0 and rejects the
+  attack: R3 rewarded 0/27 `universal_equality` episodes in the 1.1.0 rerun (separately, 0/108
+  across the four attacks still held out for 1.1.0). The 1.0.0 measurement and the
+  technical report are kept unchanged as the historical record.
 - Container images still carry 11 HIGH CVEs with no Debian fix (time-bounded exceptions until
   2026-12-09); see `docs/security/container-vulnerabilities.md`.
 
