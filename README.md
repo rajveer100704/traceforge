@@ -27,7 +27,7 @@ evaluates on task-family-held-out splits with honest uncertainty.
 | Agent runtime | 7 allow-listed tools, fail-closed router, budgets, full trajectory recording, deterministic scripted demo provider (reference + 10 adversarial policies), OpenAI-compatible HTTP provider |
 | Verification | state, static safety, behaviour safety, hidden security tests, hidden functional + pristine visible regression, evidence integrity/quality; errors never pass |
 | Rewards | versioned policies with hard gates, deterministic breakdowns, recompute command; R1/R2 research baselines |
-| Evaluation | benchmark runner, Wilson intervals + bootstrap, per-task/split/family/difficulty metrics, leakage checks, JSON + Markdown reports, experiments A–E |
+| Evaluation | benchmark runner, Wilson intervals + task-clustered bootstrap, per-task/split/family/difficulty metrics, fail-closed leakage checks, JSON + Markdown reports, reproducibility bundles, experiments A–H |
 | Training | SFT (assistant-only masking, LoRA, checkpoints, resume, MLflow) with a real cpu-test mode; TRL GRPO adapter via `environment_factory`; Gymnasium wrapper |
 | Control plane | FastAPI (22 routes, OpenAPI, API key, 202 jobs, idempotency, consistent errors), Typer CLI, RQ workers with outbox dispatch, CAS transitions, retries, leases, recovery |
 
