@@ -1,6 +1,18 @@
 # Implementation status — TraceForge
 
-## Verifier 1.1.0 — universal-equality hardening (branch `fix/verifier-1.1.0-universal-equality`, stacked on v0.2)
+## v0.3 — research execution (in progress)
+
+Plan: `docs/plans/v0.3-research-execution.md`. Baseline audit: `docs/baseline-v0.2.0.md`.
+
+| Milestone | Status |
+|---|---|
+| PR 0 baseline audit (historical manifest + integrity tests, docs consistency) | in review |
+| S1 container CVE / SQLite security investigation | in progress (separate PR) |
+| Metric contract and telemetry; paired comparison; pre-registration and power | not started |
+| Benchmark v2, determinism, out-of-process verifier, red-team v1.2 | not started |
+| Real SFT (Experiment F) and GRPO (Experiment G) | NOT EXECUTED (no GPU or endpoint) |
+
+## Verifier 1.1.0 — universal-equality hardening (merged in PR #2; released in v0.2.0)
 
 Verified 2026-11-09 · Windows 11 · Python 3.12 · no GPU · Docker Desktop 28.3.2.
 
@@ -57,7 +69,7 @@ Experiment H was re-run against 1.1.0 (see above).
 
 ---
 
-## v0.2 — research integrity and hardening (branch `feat/v0.2-research-integrity`)
+## v0.2 — research integrity and hardening (merged in PR #1; released in v0.2.0)
 
 Verified 2026-11-09 · Windows 11 · Python 3.12 · uv 0.10.7 · no GPU · Docker Desktop 28.3.2 running.
 

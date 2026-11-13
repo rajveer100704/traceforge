@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch the v0.2.0 release tag (anchor for the historical-integrity tests)
+        run: git fetch --no-tags --depth=1 origin +refs/tags/v0.2.0:refs/tags/v0.2.0
       - uses: astral-sh/setup-uv@v6
         with: {version: "0.10.7"}
       - run: uv python install 3.12

@@ -35,3 +35,6 @@ checkpoints/
 datasets/generated/
 logs/
 *.log
+
+# Exported Claude Code session transcripts (`/export`); never commit
+/traceforge-v*-session-*.txt
