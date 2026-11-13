@@ -45,6 +45,14 @@ jobs:
             test -n "$deb"
             if cat "$deb" > /dev/null 2>&1; then echo "Debian $deb is readable"; exit 1; fi
             echo "Debian $deb present but unreadable (mode $(stat -c %a "$deb"))"
+            python -c "import os, sys
+          try:
+              os.close(os.open(sys.argv[1], os.O_RDONLY))
+          except PermissionError:
+              print(\"uid\", os.getuid(), \"os.open denied:\", sys.argv[1])
+          else:
+              sys.exit(\"os.open succeeded on \" + sys.argv[1])" "$deb"
+            test "$(id -u)" = 10001
             bad=0; n=0
             for f in $(find /usr /lib /lib64 /bin /sbin -xdev -type f \( -name "*.so" -o -name "*.so.*" -o -perm -u+x \) 2>/dev/null); do
               r=$(ldd "$f" 2>/dev/null | grep libsqlite3 || true)

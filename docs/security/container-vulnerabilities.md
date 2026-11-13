@@ -61,8 +61,9 @@ Mitigations, in order of strength:
      on it, and `dpkg --purge` refused in the first CI build. Forcing removal would leave a
      broken package database, and removing `liblastlog2-2` would mean removing `login`/util-linux
      packages from the base system.
-   - **The Debian library file is mode 000.** The sandbox runs as uid 10001 with `cap_drop ALL`,
-     so no interface can map it: not the dynamic loader, not `importlib`'s extension loader
+   - **The Debian library file is mode 000.** Sandboxed code runs non-root with `cap_drop ALL`
+     (`DockerSandboxProvider` uses uid 65534; the image default is 10001), so no interface can
+     map it: not the dynamic loader, not `importlib`'s extension loader
      (`dlopen` fails with *Permission denied*), and not ctypes (also denied by the harness;
      no other FFI module, `cffi`/`pysqlite3`/`apsw`, is installed). Only `liblastlog2-2`
      (login accounting) references it, and that never runs in the sandbox. Even there, the

@@ -269,6 +269,10 @@ def test_docker_sandbox_sqlite_build_and_policy(registry, tmp_path) -> None:  # 
 
     # Adversarial: the vulnerable Debian library is still installed (Trivy reports it). Prove
     # candidate code cannot get it into the process through any available interface.
+    from traceforge.infrastructure.sandbox.docker_provider import SANDBOX_USER
+
+    sandbox_uid = int(SANDBOX_USER.split(":")[0])  # the provider runs candidate code as this uid
+    assert sandbox_uid != 0
     debian_lib = (
         "import glob, importlib.machinery, importlib.util, os\n"
         "def _debian():\n"
@@ -305,7 +309,7 @@ def test_docker_sandbox_sqlite_build_and_policy(registry, tmp_path) -> None:  # 
         # A read-only open is allowed by the harness policy, so the denial below comes from the
         # file mode (000) enforced by the kernel for the non-root, capability-free sandbox user.
         "def test_os_open_debian_library_denied():\n"
-        "    assert os.getuid() == 10001, os.getuid()\n"
+        f"    assert os.getuid() == {sandbox_uid}, os.getuid()\n"
         "    path = _debian()\n"
         "    try:\n"
         "        fd = os.open(path, os.O_RDONLY)\n"

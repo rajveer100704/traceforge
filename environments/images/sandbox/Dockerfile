@@ -53,9 +53,10 @@ COPY --from=sqlite-build /build/libsqlite3.so.0 /usr/local/lib/libsqlite3.so.0
 #    3.54.1 without FTS/R-Tree/session. Trivy still reports the unused Debian package (see
 #    security/vulnerability-exceptions.yaml); it cannot see the source-built library, so
 #    SQLite advisories for it are tracked manually (docs/security/container-vulnerabilities.md).
-#    The Debian library file itself is made unreadable (mode 000) to non-root users. The sandbox
-#    runs as uid 10001 without capabilities, so no interface (ctypes, extension loading, the
-#    dynamic loader) can map it there. Nothing in the sandbox needs it: it is only reached
+#    The Debian library file itself is made unreadable (mode 000) to non-root users. Sandboxed
+#    code runs non-root without capabilities (DockerSandboxProvider uses uid 65534; the image
+#    default is 10001), so no interface (ctypes, extension loading, the dynamic loader) can map
+#    it there. Nothing in the sandbox needs it: it is only reached
 #    through liblastlog2-2 (login accounting), which never runs. This does NOT fix the CVEs: the
 #    vulnerable package remains installed and Trivy correctly keeps reporting it.
 # 3. Remove setuid/setgid bits: sandboxed code must never be able to elevate privileges
