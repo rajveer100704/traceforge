@@ -389,5 +389,8 @@ def test_verifier_provenance_hash_tracks_static_rules(
     out = write_bundle(platform, tmp_path, experiment="X", document={})
     meta = json.loads((Path(out["dir"]) / "bundle.json").read_text(encoding="utf-8"))
     ver = meta["provenance"]["verifier"]
-    assert ver["verifier_version"] == "1.1.0" and ver["config_hash"] == a["config_hash"]
+    # Bundles also record the sandbox identity (SQLite build), which is part of the hash.
+    expected = verifier_provenance(platform.sandbox)["config_hash"]
+    assert ver["verifier_version"] == "1.1.0" and ver["config_hash"] == expected
+    assert ver["sandbox"]["provider"] == platform.sandbox.name
     assert "__eq__" in ver["static_safety"]["forbidden_comparison_dunders"]

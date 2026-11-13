@@ -28,11 +28,45 @@ jobs:
             suid="$(docker run --rm "$img" sh -c 'find / -xdev -perm /6000 -type f 2>/dev/null' || true)"
             if [ -n "$suid" ]; then echo "setuid/setgid binaries in $img:"; echo "$suid"; exit 1; fi
           done
+      - name: Sandbox Python loads the source-built SQLite, not Debian's (Trivy cannot see it)
+        run: |
+          docker run --rm traceforge-sandbox:0.1 python -c "import sqlite3, sys; \
+          v = sqlite3.sqlite_version; o = [r[0] for r in sqlite3.connect(':memory:').execute('PRAGMA compile_options')]; \
+          m = sorted({l.split()[-1] for l in open('/proc/self/maps') if 'libsqlite3' in l}); \
+          bad = [x for x in o if any(k in x for k in ('FTS3', 'FTS4', 'FTS5', 'RTREE', 'SESSION'))]; \
+          print(v, m, o); \
+          sys.exit(0 if v == '3.54.1' and not bad and 'MAX_ATTACHED=0' in o and m == ['/usr/local/lib/libsqlite3.so.0'] else 'unexpected SQLite build')"
+      - name: Sandbox has no alternate SQLite linkage and cannot read Debian's library
+        run: |
+          docker run --rm --entrypoint sh traceforge-sandbox:0.1 -c '
+            set -e
+            echo "uid=$(id -u)"
+            deb=$(find /usr/lib -name "libsqlite3.so.*" -type f | head -n1)
+            test -n "$deb"
+            if cat "$deb" > /dev/null 2>&1; then echo "Debian $deb is readable"; exit 1; fi
+            echo "Debian $deb present but unreadable (mode $(stat -c %a "$deb"))"
+            python -c "import os, sys
+          try:
+              os.close(os.open(sys.argv[1], os.O_RDONLY))
+          except PermissionError:
+              print(\"uid\", os.getuid(), \"os.open denied:\", sys.argv[1])
+          else:
+              sys.exit(\"os.open succeeded on \" + sys.argv[1])" "$deb"
+            test "$(id -u)" = 10001
+            bad=0; n=0
+            for f in $(find /usr /lib /lib64 /bin /sbin -xdev -type f \( -name "*.so" -o -name "*.so.*" -o -perm -u+x \) 2>/dev/null); do
+              r=$(ldd "$f" 2>/dev/null | grep libsqlite3 || true)
+              if [ -n "$r" ]; then
+                n=$((n+1)); echo "$f -> $r"
+                echo "$r" | grep -q "=> /usr/local/lib/libsqlite3.so.0 " || bad=1
+              fi
+            done
+            echo "$n object(s) link libsqlite3"; test "$n" -ge 1; test "$bad" = 0'
       - name: Docker sandbox integration tests
         run: |
           curl -LsSf https://astral.sh/uv/0.10.7/install.sh | sh
           ~/.local/bin/uv sync --frozen
-          ~/.local/bin/uv run pytest -q -m docker tests/integration/test_training_and_docker.py
+          ~/.local/bin/uv run pytest -q -m docker tests/integration/test_training_and_docker.py tests/security/test_sandbox_security.py
       - name: Install Trivy
         uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
         with: {version: "${{ env.TRIVY_VERSION }}", cache: true}

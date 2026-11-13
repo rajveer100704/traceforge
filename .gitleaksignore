@@ -14,3 +14,7 @@ bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/l
 bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:29
 bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:30
 bb802bf64ff9be2a5f502285ddd3c6bef600343e:src/traceforge/modules/tasks/families/legacy_1_0_0.py:generic-api-key:31
+# False positive: synthetic placeholder strings in the secret-redaction unit test (commit
+# b81db0d, the initial commit). The line now carries an inline 'gitleaks:allow'; this exact
+# fingerprint covers the historical commit, which full-history scheduled scans still see.
+b81db0d1c48043a1c7c1b655cc83d85c992fd557:tests/unit/test_jobs_statistics_safety.py:generic-api-key:104

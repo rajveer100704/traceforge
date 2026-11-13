@@ -5,6 +5,140 @@ Scanner: Trivy v0.70.0 (`--scanners vuln`), same version locally and in CI. Imag
 both `FROM python:3.12-slim@sha256:5e2bdb1b…4fa5b` (Debian 13.7). That digest was still the
 newest `python:3.12-slim` on 2026-11-09, so re-pinning alone could not remediate anything.
 
+## Re-triage 2026-11-14 (S1)
+
+**Status sources.** Debian security tracker (2026-11-14). All 11 distinct HIGH CVEs are still
+unfixed in Debian 13 (trixie). Each is marked `no-dsa` ("Minor issue") or `postponed`, and fixed
+only in forky/sid:
+
+| CVE | Package | Fixed in |
+|---|---|---|
+| CVE-2026-76642, -78408, -78409, -78410 | util-linux | 2.42.3-1 / 2.42.4-1 |
+| CVE-2025-69720 | ncurses | 6.6+20251231-1 |
+| CVE-2026-119373, -119374, -119379 | sqlite3 | 3.54.1-1; upstream 3.54.0 |
+| CVE-2026-16742 | systemd | 261.2-1 |
+| CVE-2026-54369 | acl | 2.4.0-1; "point release update" planned |
+| CVE-2026-9538 | perl | 5.42.3-1 |
+
+**Base image.** `python:3.12-slim` still resolves to the pinned digest `5e2bdb1b…` (Docker Hub
+`last_updated` 2026-11-08), so re-pinning remediates nothing.
+
+**Re-scan.** This PR's CI `Containers` job rebuilds both images and scans them with the current
+Trivy database. The local Docker engine was not responding when this was written, so there is no
+local re-scan. The last completed scan is the scheduled run 42629979720 (2026-11-09): per image,
+0 CRITICAL, 47 HIGH, 79 MEDIUM, 66 LOW; gate PASS.
+
+### SQLite in the sandbox: reachable before, mitigated now (not fixed)
+
+**Status.** The three SQLite CVEs are **not fixed** in either image. Debian's vulnerable
+`libsqlite3-0` 3.46.1 remains installed in both, and Trivy correctly keeps reporting it. They
+are fixed only when Debian ships a fix or the package can be removed. What changed is
+reachability in the sandbox: sandboxed code now runs against a different SQLite build, and
+the Debian library is present but cannot be loaded there.
+
+Probing the v0.2 harness with the host's Python 3.12 / SQLite 3.50.4 showed that the "no
+file-backed databases" rule could be bypassed from SQL alone, from a `:memory:` connection:
+
+- `ATTACH DATABASE 'x.db'` and `VACUUM INTO 'x.db'` created files. SQLite does file I/O in C, so
+  no Python `open` audit event fires. In Docker, the working directory is the writable `/tmp`
+  tmpfs.
+- `CREATE VIRTUAL TABLE … USING fts5`, direct writes to FTS5 shadow tables (the corrupted-index
+  precondition of CVE-2026-119374), and `PRAGMA writable_schema=ON` were all allowed.
+
+Mitigations, in order of strength:
+
+1. **Patched library (sandbox image).**
+   - SQLite **3.54.1**, built from the upstream `sqlite-autoconf-3540100.tar.gz` and verified
+     against the SHA3-256 published by sqlite.org (`b6ced585…d9c4`).
+   - Compiled **without FTS3/4/5, R-Tree and session**, so none of the three CVEs' code is
+     present.
+   - Compile-time maxima that in-process code cannot raise: `MAX_ATTACHED=0` (no `ATTACH` or
+     `VACUUM INTO` at all), SQL length 1 MB, expression depth 200, compound SELECT 100, LIKE
+     pattern 10 kB, blob/string 100 MB.
+   - Python loads this library from `/usr/local/lib`, which precedes the multiarch directory
+     in the loader cache.
+   - **Package strategy: keep Debian's `libsqlite3-0`.** util-linux's `liblastlog2-2` depends
+     on it, and `dpkg --purge` refused in the first CI build. Forcing removal would leave a
+     broken package database, and removing `liblastlog2-2` would mean removing `login`/util-linux
+     packages from the base system.
+   - **The Debian library file is mode 000.** Sandboxed code runs non-root with `cap_drop ALL`
+     (`DockerSandboxProvider` uses uid 65534; the image default is 10001), so no interface can
+     map it: not the dynamic loader, not `importlib`'s extension loader
+     (`dlopen` fails with *Permission denied*), and not ctypes (also denied by the harness;
+     no other FFI module, `cffi`/`pysqlite3`/`apsw`, is installed). Only `liblastlog2-2`
+     (login accounting) references it, and that never runs in the sandbox. Even there, the
+     loader resolves `libsqlite3.so.0` to the source-built copy.
+   - Checks, failing the build or CI:
+     - the image build asserts the version and the absent modules;
+     - it reads `/proc/self/maps` to check that the interpreter maps only
+       `/usr/local/lib/libsqlite3.so.0`;
+     - it checks the Debian file is mode 000;
+     - CI runs `ldd` on every shared object and executable in the image, as uid 10001, and
+       requires every `libsqlite3` dependency to resolve to `/usr/local/lib`, so there is no
+       alternate linkage;
+     - an adversarial Docker test, as candidate code, shows the Debian file is unreadable,
+       `ctypes`/`_ctypes` are denied, no other FFI module exists, and the extension loader
+       cannot map the Debian library.
+     Trivy cannot see a source-built library, so SQLite advisories for this component are
+     tracked manually: re-check <https://sqlite.org/changes.html> and the CVE list at every
+     review.
+2. **Runtime policy (harness, local and Docker sandboxes).** Every connection is created through
+   a hardened factory, and the audit hook refuses any connection of another type (direct
+   `Connection(...)`, custom factories). The policy:
+   - `ATTACH` (and so `VACUUM INTO`), virtual tables, extension loading and PRAGMAs outside a
+     read-only allow-list are denied by an authorizer and recorded as violations;
+   - defensive mode (read-only shadow tables and schema), untrusted schema;
+   - limits on SQL length (100 kB), expression depth (100), compound SELECT (50), LIKE pattern,
+     variables, trigger depth and value size (10 MB);
+   - a 64 MiB process-wide heap limit (SQLite only allows lowering it);
+   - a 50-million-step VM budget per connection, which stopped a runaway recursive CTE after
+     about 1.3 s locally.
+3. **Container boundary (unchanged).** No network, read-only root filesystem, non-root,
+   `cap_drop ALL`, `no-new-privileges`, memory/pids/CPU limits, `noexec` tmpfs.
+
+### Residual risk
+
+The runtime policy runs in the same process as candidate code, so it is defence in depth and not
+a boundary.
+
+- Candidate code can call `set_authorizer(None)` or `setconfig(...)`, raise limits up to the
+  compile-time maxima, or call base-class methods. All of these were demonstrated locally.
+- In the Docker sandbox the compile-time layer still holds:
+  - `ATTACH` is impossible (max 0);
+  - FTS5, R-Tree and session do not exist;
+  - parser limits cannot exceed the compiled maxima;
+  - `PRAGMA writable_schema` can be re-enabled, but only corrupts an in-memory database in a
+    current SQLite.
+- In the local sandbox (trusted demo code only) the host Python's SQLite applies, which for the
+  uv-managed Python 3.12 was 3.50.4 with FTS5.
+- Removing this residual risk needs the out-of-process verifier and a stronger isolation
+  boundary (plan PR 6 / Phase 6).
+
+### Also fixed: untrusted code via re-verification
+
+`reverify` re-executes a stored episode's code. It had no trust check, so a rollout from an
+untrusted model could be re-verified in the local (trusted-code-only) sandbox. It is now refused
+unless the provider is the trusted demo provider or the single-user override (forbidden in prod)
+is set. The platform-image SQLite assessment depends on this: untrusted code never runs in the
+platform image.
+
+### Exceptions after re-triage
+
+- All 11 are renewed: reviewed 2026-11-14, expiring 2026-12-14.
+- The three SQLite CVEs still cover both images, because the Debian package is still installed
+  in the sandbox. Their reasons now record that sandboxed code uses the source-built 3.54.1,
+  and that the Debian library is never loaded there (asserted in CI).
+- Expected HIGH count: unchanged at 47 package/CVE pairs per image, unless the re-scan finds
+  something new.
+
+### Options considered but not taken now
+
+- **Debian forky/sid packages:** mixing suites is unsupported and pulls in a new glibc.
+- **Removing util-linux, ncurses, perl-base or the systemd libraries:** they are Essential or
+  required by apt and the base system.
+- **A distroless or other minimal base:** a larger change, worth evaluating together with the
+  out-of-process verifier.
+
 ## Measured results (local scans, 2026-11-09)
 
 | Image | Before v0.2 (CRIT / HIGH / MED / LOW) | After v0.2 hardening |
@@ -60,8 +194,8 @@ run as uid 10001; after hardening neither contains a setuid/setgid binary (befor
 | CVE | Package(s) | Assessment |
 |---|---|---|
 | CVE-2026-78408 / 78409 / 78410 | util-linux family | Same precondition as CVE-2026-76642 (privileged mount/nsenter). Not reachable. |
-| CVE-2026-119373 / 119374 | libsqlite3-0 | FTS5 heap overflow and corrupted-index code execution. **Platform:** never creates FTS5 tables, so not reachable. **Sandbox: reachable** by untrusted candidate code, because sqlite3 is allowed for the SQL-injection tasks. Native code execution there would bypass the in-process Python audit hook but stay inside the container (no network, read-only rootfs, non-root, no capabilities, resource limits). **Follow-up:** have the harness deny virtual tables with a SQLite authorizer. |
-| CVE-2026-119379 | libsqlite3-0 | Session-changeset code execution. Python's `sqlite3` module does not expose the session extension. Not reachable. |
+| CVE-2026-119373 / 119374 | libsqlite3-0 | FTS5 heap overflows. **Not fixed: the vulnerable package is installed in both images.** **Sandbox (mitigated 2026-11-14):** sandboxed code uses a source-built SQLite 3.54.1 without FTS5. The Debian library is mode 000 and cannot be mapped by the sandbox user (see Re-triage). **Platform:** no FTS5 tables, no external database files, no untrusted code. Not reachable. |
+| CVE-2026-119379 | libsqlite3-0 | Session-changeset overflow. Python's `sqlite3` does not expose the session extension, and the SQLite the sandbox uses omits it. Not reachable. |
 | CVE-2026-16742 | libsystemd0, libudev1 | Affects systemd-homed, which is not installed or running in either container. Not reachable. |
 | CVE-2026-54369 | libacl1 | Needs a privileged process applying ACLs to attacker-controlled paths; none exists in either image. Not reachable. |
 | CVE-2026-9538 | perl-base | Archive::Tar DoS (Debian: fix deferred). Perl is never executed. Not reachable. |
@@ -83,4 +217,4 @@ The gate behaves as follows:
 - Nothing is suppressed inside Trivy itself: the uploaded JSON reports always contain every
   finding.
 
-Next review: on or before 2026-12-09, or earlier if the weekly scan reports a fix.
+Next review: on or before 2026-12-14, or earlier if the weekly scan reports a fix or SQLite publishes an advisory affecting 3.54.1.

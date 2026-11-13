@@ -101,7 +101,7 @@ def test_scan_accepts_legitimate_fix() -> None:
 
 
 def test_secret_redaction() -> None:
-    text = 'api_key=abcd1234efgh token: "zzzzzzzz" sk-ABCDEFGHIJKLMNOPQRST ghp_aaaaaaaaaaaaaaaaaaaaaaaa Bearer xyz.abc.def'
+    text = 'api_key=abcd1234efgh token: "zzzzzzzz" sk-ABCDEFGHIJKLMNOPQRST ghp_aaaaaaaaaaaaaaaaaaaaaaaa Bearer xyz.abc.def'  # gitleaks:allow - synthetic redaction fixtures, not secrets
     out = redact(text)
     for secret in ("abcd1234efgh", "sk-ABCDEFGHIJKLMNOPQRST", "ghp_aaaa", "xyz.abc.def"):
         assert secret not in out

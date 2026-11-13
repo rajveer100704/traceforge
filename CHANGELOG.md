@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## Unreleased
+
 ### Added
 - `research/HISTORICAL_SHA256SUMS`: SHA-256 of every protected historical artifact (v0.2.0
   experiment outputs and bundles, the v0.2 technical report, the frozen task-version 1.0.0
@@ -15,6 +17,30 @@
 - Documentation consistency: README lists experiments A–H; implementation status no longer
   describes merged work as open branches; the 0.2.0 known-issues entry below is reworded.
 
+### Security
+- Sandbox image ships SQLite 3.54.1 built from verified upstream source without FTS3/4/5, R-Tree
+  and session, with compile-time limits (no attached databases). Sandboxed Python loads it
+  instead of Debian's `libsqlite3-0` (3.46.1; CVE-2026-119373/119374/119379, no Debian fix).
+  The vulnerable Debian package remains installed, because util-linux's `liblastlog2-2`
+  depends on it, so these CVEs are mitigated in the sandbox, not fixed. Its library file is
+  made unreadable to the sandbox user. The build and CI assert that only the source-built
+  library is mapped (`/proc/self/maps`), that nothing in the image links the Debian copy
+  (`ldd` over every shared object), and that candidate code cannot load it (ctypes denied,
+  extension loader gets *Permission denied*).
+- Harness SQLite policy for every connection (local and Docker sandboxes): it denies ATTACH,
+  VACUUM INTO, virtual tables, extension loading and non-allow-listed PRAGMAs; sets defensive
+  mode, parser/size limits, a heap limit and a VM-step budget; and refuses connections not made
+  through the hardened factory. This closes SQL-level bypasses of the "no file-backed database"
+  rule (ATTACH/VACUUM INTO created files without a Python `open` event). It is defence in depth;
+  residual risks are in `docs/security/container-vulnerabilities.md`.
+- `reverify` refuses to execute code from untrusted model providers in a trusted-code-only
+  (local) sandbox, matching the rollout and GRPO gates.
+- `verifier_provenance()` records the SHA-256 of the sandbox harness.
+- Container exceptions re-triaged on 2026-11-14: all 11 CVEs are still unfixed in Debian 13;
+  renewed to 2026-12-14. The SQLite entries record why the remaining Debian package is not
+  reachable in either image.
+- gitleaks: exact-fingerprint ignore for synthetic placeholders in the redaction unit test,
+  which full-history scheduled scans flagged.
 ## Verifier 1.1.0 — universal-equality hardening (released in 0.2.0, 2026-11-09)
 
 ### Background: the 1.0.0 weakness

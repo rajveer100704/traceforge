@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
-from traceforge.contracts.common import NotFoundError, sha256_json
+from traceforge.contracts.common import CapabilityUnavailable, NotFoundError, sha256_json
 from traceforge.contracts.datasets import CurationLevel, DatasetKind, QualityReport
 from traceforge.contracts.experiments import (
     BenchmarkConfig,
@@ -378,6 +378,20 @@ class RolloutService:
     ) -> tuple[VerificationResult, RewardBreakdown | None]:
         """Re-run independent verification on a stored, immutable episode record."""
         summary = self.get(rollout_id)
+        # Re-verification executes the stored candidate code. Code written by an untrusted model
+        # must not run in a trusted-code-only sandbox (the local process provider), even if the
+        # rollout itself originally ran in Docker: the same gate as AgentRunner applies here.
+        sandbox = self.executor.verifier.sandbox
+        if (
+            sandbox.trusted_code_only
+            and summary.provider_kind != "demo"
+            and not self.executor.runner.allow_untrusted
+        ):
+            raise CapabilityUnavailable(
+                f"rollout {rollout_id} contains code from untrusted provider "
+                f"'{summary.provider_kind}'; sandbox '{sandbox.name}' only runs trusted demo code. "
+                "Re-verify with the docker sandbox."
+            )
         episode = self.load_episode(rollout_id)
         bundle = self.registry.bundle(summary.task_id, summary.task_version)
         verification = self.executor.verifier.verify(
