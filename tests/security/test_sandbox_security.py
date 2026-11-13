@@ -238,11 +238,29 @@ def test_docker_sandbox_sqlite_build_and_policy(registry, tmp_path) -> None:  # 
         "        assert 'too many attached' in str(exc), exc\n"
         "    else:\n"
         "        raise AssertionError('ATTACH succeeded')\n"
+        "def test_vacuum_into_impossible_even_without_runtime_policy():\n"
+        "    import os\n"
+        "    c = sqlite3.connect(':memory:')\n"
+        "    c.set_authorizer(None)\n"
+        "    c.setlimit(sqlite3.SQLITE_LIMIT_ATTACHED, 10)\n"
+        "    c.execute('CREATE TABLE t(a)')\n"
+        "    try:\n"
+        "        c.execute(\"VACUUM INTO '/tmp/vacuum-probe.db'\")\n"
+        "    except sqlite3.OperationalError as exc:\n"
+        "        assert 'too many attached' in str(exc), exc\n"
+        "    else:\n"
+        "        raise AssertionError('VACUUM INTO succeeded')\n"
+        "    assert not os.path.exists('/tmp/vacuum-probe.db')\n"
+        "def test_interpreter_maps_only_the_source_built_library():\n"
+        "    sqlite3.connect(':memory:')\n"
+        "    with open('/proc/self/maps') as f:\n"
+        "        maps = {line.split()[-1] for line in f if 'libsqlite3' in line}\n"
+        "    assert maps == {'/usr/local/lib/libsqlite3.so.0'}, maps\n"
     )
     result = provider.run_isolated_verifier(
         {"app/__init__.py": ""}, {"t.py": build}, "t.py", budget
     )
-    assert result.result_parsed and result.passed == 3, result.output_tail
+    assert result.result_parsed and result.passed == 5, result.output_tail
     for name in sorted(n for n in PROBES if n.startswith("sqlite_")):
         r = provider.run_isolated_verifier(
             {"app/__init__.py": ""}, {"t.py": PROBES[name]}, "t.py", budget
@@ -264,13 +282,31 @@ def test_reverify_refuses_untrusted_code_in_trusted_only_sandbox(platform, monke
     )  # trusted demo code: allowed
     untrusted = s.model_copy(update={"provider_kind": "openai_compatible"})
     monkeypatch.setattr(platform.rollouts, "get", lambda _rid: untrusted)
+    # The refusal must happen before anything is loaded or executed, not after verification.
+    calls: list[str] = []
+    real_load, real_verify = (
+        platform.rollouts.load_episode,
+        platform.rollouts.executor.verifier.verify,
+    )
+    monkeypatch.setattr(
+        platform.rollouts,
+        "load_episode",
+        lambda *a, **k: calls.append("load") or real_load(*a, **k),
+    )
+    monkeypatch.setattr(
+        platform.rollouts.executor.verifier,
+        "verify",
+        lambda *a, **k: calls.append("verify") or real_verify(*a, **k),
+    )
     with pytest.raises(CapabilityUnavailable, match="untrusted provider"):
         platform.rollouts.reverify(s.rollout_id, s.verification.profile)
+    assert calls == []
     # Explicit single-user research override (forbidden in prod) restores the old behaviour.
     monkeypatch.setattr(platform.rollouts.executor.runner, "allow_untrusted", True)
     assert platform.rollouts.reverify(s.rollout_id, s.verification.profile)[0].verdict == (
         s.verification.verdict
     )
+    assert calls == ["load", "verify"]
 
 
 def test_verifier_provenance_records_sandbox_harness() -> None:
@@ -280,3 +316,39 @@ def test_verifier_provenance_records_sandbox_harness() -> None:
 
     prov = verifier_provenance()
     assert prov["sandbox_harness_sha256"] == sha256_text(runner_source())
+
+
+def test_verifier_provenance_identifies_sandbox_sqlite_build(sandbox) -> None:  # type: ignore[no-untyped-def]
+    """Local and Docker sandboxes run different SQLite builds; the identity is hashed."""
+    import sqlite3
+
+    from traceforge.application.reproducibility import sandbox_identity, verifier_provenance
+
+    ident = sandbox_identity(sandbox)
+    assert ident["provider"] == "local" and ident["sqlite_version"] == sqlite3.sqlite_version
+    with_sandbox, without = verifier_provenance(sandbox), verifier_provenance()
+    assert with_sandbox["sandbox"] == ident
+    assert with_sandbox["config_hash"] != without["config_hash"]
+
+    class FakeImage:
+        id = "sha256:abc"
+        labels = {"org.traceforge.sqlite.version": "3.54.1"}
+
+    class FakeDocker:
+        name, isolation, image = "docker", "container", "traceforge-sandbox:0.1"
+
+        def _docker(self):  # type: ignore[no-untyped-def]
+            class Images:
+                def get(self, _ref):  # type: ignore[no-untyped-def]
+                    return FakeImage()
+
+            return type("Client", (), {"images": Images()})()
+
+    assert sandbox_identity(FakeDocker())["sqlite_version"] == "3.54.1"
+
+    class Unavailable(FakeDocker):
+        def _docker(self):  # type: ignore[no-untyped-def]
+            raise ConnectionError("daemon down")
+
+    gone = sandbox_identity(Unavailable())
+    assert gone["sqlite_version"] is None and gone["unavailable"] == "ConnectionError"

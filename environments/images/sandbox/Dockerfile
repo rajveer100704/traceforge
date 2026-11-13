@@ -45,20 +45,25 @@ COPY --from=sqlite-build /build/libsqlite3.so.0 /usr/local/lib/libsqlite3.so.0
 # 1. Apply Debian security updates published after the base image was built (e.g. zlib1g
 #    CVE-2026-85091). Trade-off: the package set can change between builds of the same digest;
 #    the weekly CI re-scan and the vulnerability gate catch regressions.
-# 2. Replace Debian's libsqlite3-0 with the build above. `dpkg --purge` (not apt) fails the
-#    build if any installed package still depends on it, instead of removing more packages.
-#    Trivy cannot see the source-built library; CI asserts its version and options instead,
-#    and SQLite advisories are tracked manually (docs/security/container-vulnerabilities.md).
+# 2. Python loads the build above, not Debian's libsqlite3-0. The Debian package stays installed
+#    because util-linux's liblastlog2-2 depends on it (dpkg refuses to remove it, and forcing
+#    that would leave a broken package database). /usr/local/lib precedes the multiarch
+#    directories in the loader cache. The check below fails the build unless the interpreter
+#    actually maps /usr/local/lib/libsqlite3.so.0 (via /proc/self/maps) and that library is
+#    3.54.1 without FTS/R-Tree/session. Trivy still reports the unused Debian package (see
+#    security/vulnerability-exceptions.yaml); it cannot see the source-built library, so
+#    SQLite advisories for it are tracked manually (docs/security/container-vulnerabilities.md).
 # 3. Remove setuid/setgid bits: sandboxed code must never be able to elevate privileges
 #    (defence in depth on top of no-new-privileges + cap_drop ALL in DockerSandboxProvider).
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
- && dpkg --purge libsqlite3-0 \
  && ldconfig \
  && python -c "import sqlite3, sys; \
 v = sqlite3.sqlite_version; opts = [r[0] for r in sqlite3.connect(':memory:').execute('PRAGMA compile_options')]; \
+maps = [l.split()[-1] for l in open('/proc/self/maps') if 'libsqlite3' in l]; \
 bad = [o for o in opts if any(k in o for k in ('FTS3', 'FTS4', 'FTS5', 'RTREE', 'SESSION'))]; \
-sys.exit('unexpected SQLite build: %s %s' % (v, bad)) if v != sys.argv[1] or bad or 'MAX_ATTACHED=0' not in opts else print('sqlite', v)" "$SQLITE_VERSION" \
+ok = v == sys.argv[1] and not bad and 'MAX_ATTACHED=0' in opts and set(maps) == {'/usr/local/lib/libsqlite3.so.0'}; \
+sys.exit('unexpected SQLite: %s %s %s' % (v, bad, sorted(set(maps)))) if not ok else print('sqlite', v, maps[0])" "$SQLITE_VERSION" \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /root/.cache \
  && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin sandbox \

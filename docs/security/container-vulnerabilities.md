@@ -49,9 +49,13 @@ Remediation, in order of strength:
    - Compile-time maxima that in-process code cannot raise: `MAX_ATTACHED=0` (no `ATTACH` or
      `VACUUM INTO` at all), SQL length 1 MB, expression depth 200, compound SELECT 100, LIKE
      pattern 10 kB, blob/string 100 MB.
-   - Debian `libsqlite3-0` is removed with `dpkg --purge`, which fails the build if anything
-     still depends on it.
-   - The image build and CI assert the version, the absent modules and the purged package.
+   - Python loads this library from `/usr/local/lib`. Debian's `libsqlite3-0` 3.46.1 stays
+     installed only because util-linux's `liblastlog2-2` depends on it: `dpkg --purge` refused,
+     and forcing it would leave a broken package database. No sandbox process loads the
+     Debian library, and loading other libraries is denied (ctypes, extension loading).
+   - The image build and CI assert the version and the absent modules. They also read
+     `/proc/self/maps` to check that the interpreter maps only
+     `/usr/local/lib/libsqlite3.so.0`.
      Trivy cannot see a source-built library, so SQLite advisories for this component are
      tracked manually: re-check <https://sqlite.org/changes.html> and the CVE list at every
      review.
@@ -98,9 +102,11 @@ platform image.
 ### Exceptions after re-triage
 
 - All 11 are renewed: reviewed 2026-11-14, expiring 2026-12-14.
-- The three SQLite CVEs now cover only `traceforge:ci`, because the sandbox no longer contains
-  `libsqlite3-0`.
-- Expected sandbox HIGH count: 47 - 3 = 44 package/CVE pairs, if the re-scan finds nothing new.
+- The three SQLite CVEs still cover both images, because the Debian package is still installed
+  in the sandbox. Their reasons now record that sandboxed code uses the source-built 3.54.1,
+  and that the Debian library is never loaded there (asserted in CI).
+- Expected HIGH count: unchanged at 47 package/CVE pairs per image, unless the re-scan finds
+  something new.
 
 ### Options considered but not taken now
 
@@ -165,8 +171,8 @@ run as uid 10001; after hardening neither contains a setuid/setgid binary (befor
 | CVE | Package(s) | Assessment |
 |---|---|---|
 | CVE-2026-78408 / 78409 / 78410 | util-linux family | Same precondition as CVE-2026-76642 (privileged mount/nsenter). Not reachable. |
-| CVE-2026-119373 / 119374 | libsqlite3-0 | FTS5 heap overflows. **Sandbox:** remediated on 2026-11-14; the image has a source-built SQLite 3.54.1 without FTS5 and no `libsqlite3-0` (see Re-triage). **Platform:** no FTS5 tables, no external database files, no untrusted code. Not reachable. |
-| CVE-2026-119379 | libsqlite3-0 | Session-changeset overflow. Python's `sqlite3` does not expose the session extension, and the sandbox build omits it. Not reachable. |
+| CVE-2026-119373 / 119374 | libsqlite3-0 | FTS5 heap overflows. **Sandbox:** remediated on 2026-11-14. Sandboxed code uses a source-built SQLite 3.54.1 without FTS5. The Debian package remains only as a dependency of `liblastlog2-2` and is never loaded (see Re-triage). **Platform:** no FTS5 tables, no external database files, no untrusted code. Not reachable. |
+| CVE-2026-119379 | libsqlite3-0 | Session-changeset overflow. Python's `sqlite3` does not expose the session extension, and the SQLite the sandbox uses omits it. Not reachable. |
 | CVE-2026-16742 | libsystemd0, libudev1 | Affects systemd-homed, which is not installed or running in either container. Not reachable. |
 | CVE-2026-54369 | libacl1 | Needs a privileged process applying ACLs to attacker-controlled paths; none exists in either image. Not reachable. |
 | CVE-2026-9538 | perl-base | Archive::Tar DoS (Debian: fix deferred). Perl is never executed. Not reachable. |

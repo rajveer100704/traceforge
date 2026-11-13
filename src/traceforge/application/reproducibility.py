@@ -63,7 +63,32 @@ def git_state(cwd: Path | None = None) -> dict[str, Any]:
     }
 
 
-def verifier_provenance() -> dict[str, Any]:
+def sandbox_identity(sandbox: Any) -> dict[str, Any]:
+    """Which execution environment ran the hidden tests, including its SQLite build.
+
+    The local provider runs the host interpreter (so the host's SQLite); the Docker provider runs
+    the sandbox image, whose source-built SQLite version is recorded in an image label. Values
+    that cannot be determined are reported as None with the reason, never guessed.
+    """
+    import platform as host
+    import sqlite3
+
+    name = getattr(sandbox, "name", None)
+    ident: dict[str, Any] = {"provider": name, "isolation": getattr(sandbox, "isolation", None)}
+    if name == "local":
+        ident.update(python=host.python_version(), sqlite_version=sqlite3.sqlite_version)
+    elif name == "docker":
+        ident["image"] = getattr(sandbox, "image", None)
+        try:
+            image = sandbox._docker().images.get(sandbox.image)
+            ident["image_id"] = image.id
+            ident["sqlite_version"] = (image.labels or {}).get("org.traceforge.sqlite.version")
+        except Exception as exc:  # daemon or image unavailable: record, do not guess
+            ident.update(image_id=None, sqlite_version=None, unavailable=type(exc).__name__)
+    return ident
+
+
+def verifier_provenance(sandbox: Any = None) -> dict[str, Any]:
     from traceforge.contracts.common import sha256_text
     from traceforge.infrastructure.sandbox.common import runner_source
     from traceforge.modules.tasks.registry import HIDDEN_TEST_MODULE, VERIFIER_ID, VERIFIER_VERSION
@@ -87,6 +112,9 @@ def verifier_provenance() -> dict[str, Any]:
         # hashing its source records exactly which policy verified a run.
         "sandbox_harness_sha256": sha256_text(runner_source()),
     }
+    if sandbox is not None:
+        # Local and Docker sandboxes run different SQLite builds: part of the verifier identity.
+        effective["sandbox"] = sandbox_identity(sandbox)
     return {**effective, "config_hash": sha256_json(effective)}
 
 
@@ -116,7 +144,7 @@ def platform_provenance(p: Platform) -> dict[str, Any]:
             sorted((b.spec.task_id, b.spec.version, b.oracle.fixture_hash) for b in tasks)
         ),
         "n_tasks": len(tasks),
-        "verifier": verifier_provenance(),
+        "verifier": verifier_provenance(p.sandbox),
         "reward_policies": policies,
         "attack_catalog_version": CATALOG_VERSION,
         "leakage_checks_version": LEAKAGE_CHECKS_VERSION,

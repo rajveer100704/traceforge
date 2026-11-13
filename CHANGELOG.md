@@ -4,8 +4,10 @@
 
 ### Security
 - Sandbox image ships SQLite 3.54.1 built from verified upstream source without FTS3/4/5, R-Tree
-  and session, with compile-time limits (no attached databases). Debian `libsqlite3-0` (3.46.1;
-  CVE-2026-119373/119374/119379, no Debian fix) is removed from the sandbox image.
+  and session, with compile-time limits (no attached databases). Sandboxed Python loads it
+  instead of Debian's `libsqlite3-0` (3.46.1; CVE-2026-119373/119374/119379, no Debian fix).
+  The Debian package remains only as a dependency of util-linux's `liblastlog2-2` and is never
+  loaded; the build and CI assert this via `/proc/self/maps`.
 - Harness SQLite policy for every connection (local and Docker sandboxes): it denies ATTACH,
   VACUUM INTO, virtual tables, extension loading and non-allow-listed PRAGMAs; sets defensive
   mode, parser/size limits, a heap limit and a VM-step budget; and refuses connections not made
@@ -16,7 +18,8 @@
   (local) sandbox, matching the rollout and GRPO gates.
 - `verifier_provenance()` records the SHA-256 of the sandbox harness.
 - Container exceptions re-triaged on 2026-11-14: all 11 CVEs are still unfixed in Debian 13;
-  renewed to 2026-12-14, with the SQLite entries narrowed to the platform image.
+  renewed to 2026-12-14. The SQLite entries record why the remaining Debian package is not
+  reachable in either image.
 - gitleaks: exact-fingerprint ignore for synthetic placeholders in the redaction unit test,
   which full-history scheduled scans flagged.
 

@@ -97,7 +97,9 @@ SQLITE_DBCONFIG = (
     ("SQLITE_DBCONFIG_TRUSTED_SCHEMA", False),
     ("SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION", False),
 )
-SQLITE_HEAP_LIMIT_BYTES = 64 * 1024 * 1024  # process-wide; SQLite only ever lowers this limit
+# Process-wide 64 MiB heap cap; SQLite only ever lowers this limit. A literal statement (no
+# interpolation): nothing user-controlled ever reaches it.
+SQLITE_HEAP_LIMIT_PRAGMA = "PRAGMA hard_heap_limit=67108864"
 SQLITE_PROGRESS_INTERVAL = 10_000
 SQLITE_MAX_VM_STEPS = 50_000_000  # per connection
 SQLITE_ALLOWED_PRAGMAS = frozenset(
@@ -145,7 +147,7 @@ def _harden_sqlite(conn, violations):
         conn.setconfig(getattr(sqlite3, name), enabled)
     for name, value in SQLITE_LIMITS:
         conn.setlimit(getattr(sqlite3, name), value)
-    conn.execute(f"PRAGMA hard_heap_limit={SQLITE_HEAP_LIMIT_BYTES:d}")
+    conn.execute(SQLITE_HEAP_LIMIT_PRAGMA)
     conn.set_progress_handler(progress, SQLITE_PROGRESS_INTERVAL)
     conn.set_authorizer(authorizer)
 
