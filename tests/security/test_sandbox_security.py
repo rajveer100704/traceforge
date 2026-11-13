@@ -302,11 +302,32 @@ def test_docker_sandbox_sqlite_build_and_policy(registry, tmp_path) -> None:  # 
         "    else:\n"
         "        raise AssertionError('Debian libsqlite3 was loaded')\n"
         "    assert _mapped() == {'/usr/local/lib/libsqlite3.so.0'}, _mapped()\n"
+        # A read-only open is allowed by the harness policy, so the denial below comes from the
+        # file mode (000) enforced by the kernel for the non-root, capability-free sandbox user.
+        "def test_os_open_debian_library_denied():\n"
+        "    assert os.getuid() == 10001, os.getuid()\n"
+        "    path = _debian()\n"
+        "    try:\n"
+        "        fd = os.open(path, os.O_RDONLY)\n"
+        "    except PermissionError:\n"
+        "        pass\n"
+        "    else:\n"
+        "        os.close(fd)\n"
+        "        raise AssertionError('Debian libsqlite3 opened: ' + path)\n"
+        "def test_ordinary_sqlite_still_works():\n"
+        "    import sqlite3\n"
+        "    c = sqlite3.connect(':memory:')\n"
+        "    c.execute('CREATE TABLE t(a INTEGER, b TEXT)')\n"
+        "    c.executemany('INSERT INTO t VALUES (?, ?)', [(1, 'x'), (2, \"y'z\")])\n"
+        "    assert c.execute('SELECT a FROM t WHERE b = ?', (\"y'z\",)).fetchall() == [(2,)]\n"
+        "    assert sqlite3.sqlite_version == '3.54.1'\n"
     )
     adv = provider.run_isolated_verifier(
         {"app/__init__.py": ""}, {"t.py": debian_lib}, "t.py", budget
     )
-    assert adv.result_parsed and adv.passed == 4, adv.output_tail
+    assert adv.result_parsed and adv.passed == 6, adv.output_tail
+    # Only the deliberate ctypes imports are violations; read-only probing and ordinary SQL are not.
+    assert set(adv.violations) == {"import:ctypes", "import:_ctypes"}, adv.violations
 
     # Provenance records the image actually used and its SQLite build (label asserted at build).
     from traceforge.application.reproducibility import sandbox_identity
