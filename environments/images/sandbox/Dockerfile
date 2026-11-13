@@ -53,6 +53,11 @@ COPY --from=sqlite-build /build/libsqlite3.so.0 /usr/local/lib/libsqlite3.so.0
 #    3.54.1 without FTS/R-Tree/session. Trivy still reports the unused Debian package (see
 #    security/vulnerability-exceptions.yaml); it cannot see the source-built library, so
 #    SQLite advisories for it are tracked manually (docs/security/container-vulnerabilities.md).
+#    The Debian library file itself is made unreadable (mode 000) to non-root users. The sandbox
+#    runs as uid 10001 without capabilities, so no interface (ctypes, extension loading, the
+#    dynamic loader) can map it there. Nothing in the sandbox needs it: it is only reached
+#    through liblastlog2-2 (login accounting), which never runs. This does NOT fix the CVEs: the
+#    vulnerable package remains installed and Trivy correctly keeps reporting it.
 # 3. Remove setuid/setgid bits: sandboxed code must never be able to elevate privileges
 #    (defence in depth on top of no-new-privileges + cap_drop ALL in DockerSandboxProvider).
 RUN apt-get update \
@@ -67,6 +72,8 @@ sys.exit('unexpected SQLite: %s %s %s' % (v, bad, sorted(set(maps)))) if not ok 
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /root/.cache \
  && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin sandbox \
+ && for f in $(dpkg -L libsqlite3-0 | grep '/libsqlite3\.so'); do [ -L "$f" ] || chmod 000 "$f"; done \
+ && test -n "$(find /usr/lib -name 'libsqlite3.so.*' -type f -perm 000)" \
  && find / -xdev -perm /6000 -type f -exec chmod a-s {} +
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONHASHSEED=0
 USER 10001:10001

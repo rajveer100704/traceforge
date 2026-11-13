@@ -6,8 +6,12 @@
 - Sandbox image ships SQLite 3.54.1 built from verified upstream source without FTS3/4/5, R-Tree
   and session, with compile-time limits (no attached databases). Sandboxed Python loads it
   instead of Debian's `libsqlite3-0` (3.46.1; CVE-2026-119373/119374/119379, no Debian fix).
-  The Debian package remains only as a dependency of util-linux's `liblastlog2-2` and is never
-  loaded; the build and CI assert this via `/proc/self/maps`.
+  The vulnerable Debian package remains installed, because util-linux's `liblastlog2-2`
+  depends on it, so these CVEs are mitigated in the sandbox, not fixed. Its library file is
+  made unreadable to the sandbox user. The build and CI assert that only the source-built
+  library is mapped (`/proc/self/maps`), that nothing in the image links the Debian copy
+  (`ldd` over every shared object), and that candidate code cannot load it (ctypes denied,
+  extension loader gets *Permission denied*).
 - Harness SQLite policy for every connection (local and Docker sandboxes): it denies ATTACH,
   VACUUM INTO, virtual tables, extension loading and non-allow-listed PRAGMAs; sets defensive
   mode, parser/size limits, a heap limit and a VM-step budget; and refuses connections not made

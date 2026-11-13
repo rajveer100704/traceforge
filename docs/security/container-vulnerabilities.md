@@ -28,7 +28,13 @@ Trivy database. The local Docker engine was not responding when this was written
 local re-scan. The last completed scan is the scheduled run 42629979720 (2026-11-09): per image,
 0 CRITICAL, 47 HIGH, 79 MEDIUM, 66 LOW; gate PASS.
 
-### SQLite in the sandbox: reachable, now remediated
+### SQLite in the sandbox: reachable before, mitigated now (not fixed)
+
+**Status.** The three SQLite CVEs are **not fixed** in either image. Debian's vulnerable
+`libsqlite3-0` 3.46.1 remains installed in both, and Trivy correctly keeps reporting it. They
+are fixed only when Debian ships a fix or the package can be removed. What changed is
+reachability in the sandbox: sandboxed code now runs against a different SQLite build, and
+the Debian library is present but cannot be loaded there.
 
 Probing the v0.2 harness with the host's Python 3.12 / SQLite 3.50.4 showed that the "no
 file-backed databases" rule could be bypassed from SQL alone, from a `:memory:` connection:
@@ -39,7 +45,7 @@ file-backed databases" rule could be bypassed from SQL alone, from a `:memory:` 
 - `CREATE VIRTUAL TABLE … USING fts5`, direct writes to FTS5 shadow tables (the corrupted-index
   precondition of CVE-2026-119374), and `PRAGMA writable_schema=ON` were all allowed.
 
-Remediation, in order of strength:
+Mitigations, in order of strength:
 
 1. **Patched library (sandbox image).**
    - SQLite **3.54.1**, built from the upstream `sqlite-autoconf-3540100.tar.gz` and verified
@@ -49,13 +55,29 @@ Remediation, in order of strength:
    - Compile-time maxima that in-process code cannot raise: `MAX_ATTACHED=0` (no `ATTACH` or
      `VACUUM INTO` at all), SQL length 1 MB, expression depth 200, compound SELECT 100, LIKE
      pattern 10 kB, blob/string 100 MB.
-   - Python loads this library from `/usr/local/lib`. Debian's `libsqlite3-0` 3.46.1 stays
-     installed only because util-linux's `liblastlog2-2` depends on it: `dpkg --purge` refused,
-     and forcing it would leave a broken package database. No sandbox process loads the
-     Debian library, and loading other libraries is denied (ctypes, extension loading).
-   - The image build and CI assert the version and the absent modules. They also read
-     `/proc/self/maps` to check that the interpreter maps only
-     `/usr/local/lib/libsqlite3.so.0`.
+   - Python loads this library from `/usr/local/lib`, which precedes the multiarch directory
+     in the loader cache.
+   - **Package strategy: keep Debian's `libsqlite3-0`.** util-linux's `liblastlog2-2` depends
+     on it, and `dpkg --purge` refused in the first CI build. Forcing removal would leave a
+     broken package database, and removing `liblastlog2-2` would mean removing `login`/util-linux
+     packages from the base system.
+   - **The Debian library file is mode 000.** The sandbox runs as uid 10001 with `cap_drop ALL`,
+     so no interface can map it: not the dynamic loader, not `importlib`'s extension loader
+     (`dlopen` fails with *Permission denied*), and not ctypes (also denied by the harness;
+     no other FFI module, `cffi`/`pysqlite3`/`apsw`, is installed). Only `liblastlog2-2`
+     (login accounting) references it, and that never runs in the sandbox. Even there, the
+     loader resolves `libsqlite3.so.0` to the source-built copy.
+   - Checks, failing the build or CI:
+     - the image build asserts the version and the absent modules;
+     - it reads `/proc/self/maps` to check that the interpreter maps only
+       `/usr/local/lib/libsqlite3.so.0`;
+     - it checks the Debian file is mode 000;
+     - CI runs `ldd` on every shared object and executable in the image, as uid 10001, and
+       requires every `libsqlite3` dependency to resolve to `/usr/local/lib`, so there is no
+       alternate linkage;
+     - an adversarial Docker test, as candidate code, shows the Debian file is unreadable,
+       `ctypes`/`_ctypes` are denied, no other FFI module exists, and the extension loader
+       cannot map the Debian library.
      Trivy cannot see a source-built library, so SQLite advisories for this component are
      tracked manually: re-check <https://sqlite.org/changes.html> and the CVE list at every
      review.
@@ -171,7 +193,7 @@ run as uid 10001; after hardening neither contains a setuid/setgid binary (befor
 | CVE | Package(s) | Assessment |
 |---|---|---|
 | CVE-2026-78408 / 78409 / 78410 | util-linux family | Same precondition as CVE-2026-76642 (privileged mount/nsenter). Not reachable. |
-| CVE-2026-119373 / 119374 | libsqlite3-0 | FTS5 heap overflows. **Sandbox:** remediated on 2026-11-14. Sandboxed code uses a source-built SQLite 3.54.1 without FTS5. The Debian package remains only as a dependency of `liblastlog2-2` and is never loaded (see Re-triage). **Platform:** no FTS5 tables, no external database files, no untrusted code. Not reachable. |
+| CVE-2026-119373 / 119374 | libsqlite3-0 | FTS5 heap overflows. **Not fixed: the vulnerable package is installed in both images.** **Sandbox (mitigated 2026-11-14):** sandboxed code uses a source-built SQLite 3.54.1 without FTS5. The Debian library is mode 000 and cannot be mapped by the sandbox user (see Re-triage). **Platform:** no FTS5 tables, no external database files, no untrusted code. Not reachable. |
 | CVE-2026-119379 | libsqlite3-0 | Session-changeset overflow. Python's `sqlite3` does not expose the session extension, and the SQLite the sandbox uses omits it. Not reachable. |
 | CVE-2026-16742 | libsystemd0, libudev1 | Affects systemd-homed, which is not installed or running in either container. Not reachable. |
 | CVE-2026-54369 | libacl1 | Needs a privileged process applying ACLs to attacker-controlled paths; none exists in either image. Not reachable. |

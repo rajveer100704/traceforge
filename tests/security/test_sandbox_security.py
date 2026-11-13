@@ -267,6 +267,54 @@ def test_docker_sandbox_sqlite_build_and_policy(registry, tmp_path) -> None:  # 
         )
         assert r.result_parsed and r.passed == 0, name
 
+    # Adversarial: the vulnerable Debian library is still installed (Trivy reports it). Prove
+    # candidate code cannot get it into the process through any available interface.
+    debian_lib = (
+        "import glob, importlib.machinery, importlib.util, os\n"
+        "def _debian():\n"
+        "    paths = [p for p in glob.glob('/usr/lib/*/libsqlite3.so.*') if not os.path.islink(p)]\n"
+        "    assert paths, 'Debian libsqlite3 not found'\n"
+        "    return paths[0]\n"
+        "def _mapped():\n"
+        "    with open('/proc/self/maps') as f:\n"
+        "        return {line.split()[-1] for line in f if 'libsqlite3' in line}\n"
+        "def test_debian_library_is_present_but_unreadable():\n"
+        "    path = _debian()\n"
+        "    assert not os.access(path, os.R_OK), path\n"
+        "def test_ctypes_denied():\n"
+        "    for name in ('ctypes', '_ctypes'):\n"
+        "        try:\n"
+        "            __import__(name)\n"
+        "        except PermissionError:\n"
+        "            continue\n"
+        "        raise AssertionError(name + ' importable')\n"
+        "def test_no_other_ffi_module():\n"
+        "    for name in ('cffi', '_cffi_backend', 'pysqlite3', 'apsw'):\n"
+        "        assert importlib.util.find_spec(name) is None, name\n"
+        "def test_extension_loader_cannot_map_debian_library():\n"
+        "    path = _debian()\n"
+        "    loader = importlib.machinery.ExtensionFileLoader('x_sqlite', path)\n"
+        "    spec = importlib.util.spec_from_file_location('x_sqlite', path, loader=loader)\n"
+        "    try:\n"
+        "        loader.create_module(spec)\n"
+        "    except ImportError as exc:\n"
+        "        assert 'ermission denied' in str(exc), exc\n"
+        "    else:\n"
+        "        raise AssertionError('Debian libsqlite3 was loaded')\n"
+        "    assert _mapped() == {'/usr/local/lib/libsqlite3.so.0'}, _mapped()\n"
+    )
+    adv = provider.run_isolated_verifier(
+        {"app/__init__.py": ""}, {"t.py": debian_lib}, "t.py", budget
+    )
+    assert adv.result_parsed and adv.passed == 4, adv.output_tail
+
+    # Provenance records the image actually used and its SQLite build (label asserted at build).
+    from traceforge.application.reproducibility import sandbox_identity
+
+    ident = sandbox_identity(provider)
+    assert ident["sqlite_version"] == "3.54.1"
+    assert ident["image_id"] == provider._docker().images.get("traceforge-sandbox:0.1").id
+
 
 def test_reverify_refuses_untrusted_code_in_trusted_only_sandbox(platform, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """Re-verification executes stored candidate code: model-written code must not run in the
