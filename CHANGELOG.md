@@ -7,7 +7,8 @@
   experiment outputs and bundles, the v0.2 technical report, the frozen task-version 1.0.0
   source), computed from the git objects at tag `v0.2.0` by `scripts/historical_manifest.py`.
 - `tests/integration/test_historical_integrity.py`: CI fails if a protected file changes,
-  disappears, or a historical result directory gains files; all nine bundles must verify.
+  disappears, becomes a symlink, or a historical result directory gains entries; all nine
+  bundles must verify; the manifest must equal the `v0.2.0` tag (CI fetches the tag).
 - `docs/baseline-v0.2.0.md` (baseline audit) and `docs/plans/v0.3-research-execution.md`.
 
 ### Fixed
@@ -118,7 +119,8 @@ by explicit version only, for re-verifying rollouts recorded against it.
   the held-out `universal_equality` attack on two SQL-injection templates (6/27 episodes; R3
   held-out FP rate 4.4 %, 6/135). The v0.2 research branch deliberately left 1.0.0 unpatched to
   keep that measurement clean. Verifier 1.1.0 (section above) ships in 0.2.0 and rejects the
-  attack (0/108 held-out false positives in the 1.1.0 rerun). The 1.0.0 measurement and the
+  attack: R3 rewarded 0/27 `universal_equality` episodes in the 1.1.0 rerun (separately, 0/108
+  across the four attacks still held out for 1.1.0). The 1.0.0 measurement and the
   technical report are kept unchanged as the historical record.
 - Container images still carry 11 HIGH CVEs with no Debian fix (time-bounded exceptions until
   2026-12-09); see `docs/security/container-vulnerabilities.md`.

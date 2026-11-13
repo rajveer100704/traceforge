@@ -8,13 +8,16 @@ is the authoritative reference.
     uv run python scripts/historical_manifest.py generate   # (re)write the manifest from the tag
     uv run python scripts/historical_manifest.py check      # verify the working tree against it
 
-The manifest uses `sha256sum` format, so `sha256sum -c research/HISTORICAL_SHA256SUMS` also works.
+`check` reports modified, missing, unlisted and symlinked protected entries, and, when the tag is
+available, any difference between the manifest and the tag. The manifest uses `sha256sum`
+format, so `sha256sum -c research/HISTORICAL_SHA256SUMS` also works.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import subprocess  # nosec B404 - fixed git invocations only
 import sys
 from pathlib import Path
@@ -22,10 +25,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "research" / "HISTORICAL_SHA256SUMS"
 REFERENCE_TAG = "v0.2.0"
-PROTECTED_PATHS = (
+PROTECTED_FILES = (
     "research/TRACEFORGE_TECHNICAL_REPORT.md",
-    "research/results",
     "src/traceforge/modules/tasks/families/legacy_1_0_0.py",
+)
+# Whole directories: they may not gain, lose or change entries. New results go in new directories.
+PROTECTED_DIRS = tuple(
+    f"research/results/{name}"
+    for name in (
+        "experiment_A",
+        "experiment_B",
+        "experiment_C",
+        "experiment_D",
+        "experiment_E",
+        "experiment_F",
+        "experiment_G",
+        "experiment_H",
+        "experiment_H_verifier_1.1.0",
+    )
 )
 HEADER = (
     f"# SHA-256 of protected historical artifacts, computed from git tag {REFERENCE_TAG}.\n"
@@ -40,9 +57,18 @@ def _git(*args: str) -> bytes:
     ).stdout
 
 
+def tag_available(tag: str = REFERENCE_TAG) -> bool:
+    try:
+        _git("rev-parse", "-q", "--verify", f"{tag}^{{commit}}")
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
 def tag_hashes(tag: str = REFERENCE_TAG) -> dict[str, str]:
     """SHA-256 of each protected file's blob at ``tag`` (exact committed bytes)."""
-    names = _git("ls-tree", "-r", "--name-only", tag, "--", *PROTECTED_PATHS).decode().split()
+    paths = (*PROTECTED_FILES, *PROTECTED_DIRS)
+    names = _git("ls-tree", "-r", "--name-only", tag, "--", *paths).decode().split()
     return {n: hashlib.sha256(_git("cat-file", "blob", f"{tag}:{n}")).hexdigest() for n in names}
 
 
@@ -55,15 +81,44 @@ def read_manifest(path: Path = MANIFEST) -> dict[str, str]:
     return out
 
 
-def check(path: Path = MANIFEST) -> list[str]:
+def inventory(root: Path = ROOT) -> tuple[set[str], set[str]]:
+    """(regular files, symlinks) under the protected paths, without following symlinks."""
+    files: set[str] = set()
+    links: set[str] = set()
+    for rel in PROTECTED_FILES:
+        p = root / rel
+        if p.is_symlink():
+            links.add(rel)
+        elif p.is_file():
+            files.add(rel)
+    for rel in PROTECTED_DIRS:
+        for dirpath, dirnames, filenames in os.walk(root / rel, followlinks=False):
+            for name in [*dirnames, *filenames]:
+                p = Path(dirpath) / name
+                r = p.relative_to(root).as_posix()
+                if p.is_symlink():
+                    links.add(r)
+                elif p.is_file():
+                    files.add(r)
+    return files, links
+
+
+def check(path: Path = MANIFEST, root: Path = ROOT) -> list[str]:
     """Problems with the working tree relative to the manifest (empty when intact)."""
-    problems = []
-    for name, digest in sorted(read_manifest(path).items()):
-        f = ROOT / name
+    entries = read_manifest(path)
+    files, links = inventory(root)
+    problems = [f"symlink {r}" for r in sorted(links)]
+    for name, digest in sorted(entries.items()):
+        f = root / name
+        if f.is_symlink():
+            continue  # already reported
         if not f.is_file():
             problems.append(f"missing {name}")
         elif hashlib.sha256(f.read_bytes()).hexdigest() != digest:
             problems.append(f"modified {name}")
+    problems += [f"unlisted {r}" for r in sorted(files - set(entries))]
+    if root == ROOT and tag_available() and entries != tag_hashes():
+        problems.append(f"manifest differs from tag {REFERENCE_TAG}")
     return problems
 
 

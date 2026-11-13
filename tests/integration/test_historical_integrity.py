@@ -1,16 +1,22 @@
 """Protected historical artifacts must stay byte-for-byte identical to the v0.2.0 release.
 
 The manifest (research/HISTORICAL_SHA256SUMS) was generated from the git objects at tag v0.2.0 by
-scripts/historical_manifest.py. These tests hash the working tree independently of that script.
-New results belong in new directories; historical directories may not gain, lose or change files.
+scripts/historical_manifest.py. These tests hash the working tree independently of that script,
+reject symlinks, and anchor the manifest itself to the tag (mandatory on GitHub Actions, where CI
+fetches the tag; skipped only for local clones without it). New results belong in new
+directories; historical directories may not gain, lose or change entries.
 """
 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
+import json
+import os
 import shutil
 import subprocess  # nosec B404
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -34,6 +40,7 @@ ALWAYS_PROTECTED = (
     "research/TRACEFORGE_TECHNICAL_REPORT.md",
     "src/traceforge/modules/tasks/families/legacy_1_0_0.py",
 )
+ON_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 
 
 def _manifest() -> dict[str, str]:
@@ -49,15 +56,38 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _problems(entries: dict[str, str], root: Path) -> list[str]:
-    problems = []
-    for name, digest in sorted(entries.items()):
-        f = root / name
-        if not f.is_file():
-            problems.append(f"missing {name}")
-        elif _sha256(f) != digest:
-            problems.append(f"modified {name}")
-    return problems
+def _entries_under(root: Path, rel_dir: str) -> tuple[set[str], set[str]]:
+    """(regular files, symlinks) below ``rel_dir`` without following symlinks."""
+    files: set[str] = set()
+    links: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(root / rel_dir, followlinks=False):
+        for name in [*dirnames, *filenames]:
+            p = Path(dirpath) / name
+            rel = p.relative_to(root).as_posix()
+            if p.is_symlink():
+                links.add(rel)
+            elif p.is_file():
+                files.add(rel)
+    return files, links
+
+
+def _script() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "historical_manifest", ROOT / "scripts" / "historical_manifest.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _tag_available() -> bool:
+    if shutil.which("git") is None:
+        return False
+    r = subprocess.run(  # nosec B603 B607
+        ["git", "rev-parse", "-q", "--verify", "v0.2.0^{commit}"], cwd=ROOT, capture_output=True
+    )
+    return r.returncode == 0
 
 
 def test_manifest_covers_every_protected_artifact() -> None:
@@ -70,30 +100,34 @@ def test_manifest_covers_every_protected_artifact() -> None:
     assert len(entries) == 55
 
 
-def test_protected_files_are_byte_identical_to_v0_2_0() -> None:
-    assert _problems(_manifest(), ROOT) == []
+def test_protected_files_are_regular_and_byte_identical() -> None:
+    problems = []
+    for name, digest in sorted(_manifest().items()):
+        f = ROOT / name
+        if f.is_symlink():
+            problems.append(f"symlink {name}")
+        elif not f.is_file():
+            problems.append(f"missing {name}")
+        elif _sha256(f) != digest:
+            problems.append(f"modified {name}")
+    assert problems == []
 
 
-def test_historical_directories_gain_no_files() -> None:
-    """Adding files to a historical result directory is also a modification."""
+def test_historical_directories_gain_no_entries_and_contain_no_symlinks() -> None:
     entries = set(_manifest())
     for exp in HISTORICAL_EXPERIMENTS:
-        on_disk = {
-            p.relative_to(ROOT).as_posix() for p in (RESULTS / exp).rglob("*") if p.is_file()
-        }
-        assert on_disk - entries == set(), f"unexpected files in {exp}"
+        files, links = _entries_under(ROOT, f"research/results/{exp}")
+        assert links == set(), f"symlinks in {exp}"
+        assert files - entries == set(), f"unexpected files in {exp}"
 
 
 @pytest.mark.parametrize("exp", HISTORICAL_EXPERIMENTS)
 def test_historical_bundle_verifies(exp: str) -> None:
-    bundle = RESULTS / exp / "bundle"
-    assert verify_bundle(bundle) == []
+    assert verify_bundle(RESULTS / exp / "bundle") == []
 
 
 def test_bundle_hashes_agree_with_manifest() -> None:
     """Two independent records of the same bytes: bundle.json and the tag-derived manifest."""
-    import json
-
     entries = _manifest()
     for exp in HISTORICAL_EXPERIMENTS:
         bundle = RESULTS / exp / "bundle"
@@ -102,38 +136,94 @@ def test_bundle_hashes_agree_with_manifest() -> None:
             assert entries[(bundle / rel).relative_to(ROOT).as_posix()] == digest
 
 
-def test_tampering_is_detected(tmp_path: Path) -> None:
-    name = "research/TRACEFORGE_TECHNICAL_REPORT.md"
-    copy = tmp_path / name
-    copy.parent.mkdir(parents=True)
-    shutil.copyfile(ROOT / name, copy)
-    entries = {name: _manifest()[name]}
-    assert _problems(entries, tmp_path) == []
-    copy.write_bytes(copy.read_bytes() + b"\n")
-    assert _problems(entries, tmp_path) == [f"modified {name}"]
-    copy.unlink()
-    assert _problems(entries, tmp_path) == [f"missing {name}"]
+def test_manifest_matches_release_tag() -> None:
+    """Anchors the manifest to v0.2.0, so editing a file and the manifest together still fails.
 
-
-def _tag_available() -> bool:
-    if shutil.which("git") is None:
-        return False
-    r = subprocess.run(  # nosec B603 B607
-        ["git", "rev-parse", "-q", "--verify", "v0.2.0^{commit}"],
+    CI fetches the tag explicitly, so on GitHub Actions a missing tag is a failure, not a skip.
+    """
+    if not _tag_available():
+        if ON_CI:
+            pytest.fail("tag v0.2.0 is not available in CI; the workflow must fetch it")
+        pytest.skip("git tag v0.2.0 not fetched (local clone without tags)")
+    entries = _manifest()
+    tag_names = subprocess.run(  # nosec B603 B607
+        ["git", "ls-tree", "-r", "--name-only", "v0.2.0", "--", *ALWAYS_PROTECTED]
+        + [f"research/results/{e}" for e in HISTORICAL_EXPERIMENTS],
         cwd=ROOT,
         capture_output=True,
-    )
-    return r.returncode == 0
-
-
-@pytest.mark.skipif(not _tag_available(), reason="git tag v0.2.0 not fetched (shallow clone)")
-def test_manifest_matches_release_tag() -> None:
-    """The manifest itself must equal the bytes committed at the v0.2.0 tag."""
-    for name, digest in _manifest().items():
+        check=True,
+    ).stdout.decode()
+    assert set(tag_names.split()) == set(entries)
+    for name, digest in entries.items():
         blob = subprocess.run(  # nosec B603 B607
-            ["git", "cat-file", "blob", f"v0.2.0:{name}"],
-            cwd=ROOT,
-            capture_output=True,
-            check=True,
+            ["git", "cat-file", "blob", f"v0.2.0:{name}"], cwd=ROOT, capture_output=True, check=True
         ).stdout
         assert hashlib.sha256(blob).hexdigest() == digest, name
+
+
+def test_checker_script_reports_intact_tree() -> None:
+    assert _script().check() == []
+
+
+# ---------------------------------------------------------------- negative tests (copies only)
+
+
+def _protected_copy(tmp_path: Path) -> Path:
+    for name in _manifest():
+        dst = tmp_path / name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, dst)
+    return tmp_path
+
+
+def test_checker_detects_modified_missing_and_unlisted(tmp_path: Path) -> None:
+    root = _protected_copy(tmp_path)
+    check = _script().check
+    assert check(MANIFEST, root) == []
+    report = root / "research/TRACEFORGE_TECHNICAL_REPORT.md"
+    report.write_bytes(report.read_bytes() + b"\n")
+    (root / "research/results/experiment_B/experiment_B.md").unlink()
+    (root / "research/results/experiment_H/extra.json").write_text("{}", encoding="utf-8")
+    assert sorted(check(MANIFEST, root)) == [
+        "missing research/results/experiment_B/experiment_B.md",
+        "modified research/TRACEFORGE_TECHNICAL_REPORT.md",
+        "unlisted research/results/experiment_H/extra.json",
+    ]
+
+
+def test_checker_detects_truncated_manifest(tmp_path: Path) -> None:
+    root = _protected_copy(tmp_path)
+    lines = MANIFEST.read_text(encoding="utf-8").splitlines(keepends=True)
+    truncated = tmp_path / "TRUNCATED"
+    truncated.write_text("".join(lines[:-5]), encoding="utf-8")
+    problems = _script().check(truncated, root)
+    assert len(problems) == 5 and all(p.startswith("unlisted ") for p in problems)
+
+
+def _can_symlink(tmp_path: Path) -> bool:
+    try:
+        (tmp_path / "probe-link").symlink_to(tmp_path)
+    except OSError:
+        return False
+    (tmp_path / "probe-link").unlink()
+    return True
+
+
+def test_checker_rejects_symlinked_files_and_directories(tmp_path: Path) -> None:
+    if not _can_symlink(tmp_path):
+        pytest.skip("symlink creation not permitted on this platform")
+    root = _protected_copy(tmp_path / "tree")
+    report = root / "research/TRACEFORGE_TECHNICAL_REPORT.md"
+    same_bytes = tmp_path / "elsewhere.md"
+    shutil.copyfile(report, same_bytes)
+    report.unlink()
+    report.symlink_to(same_bytes)  # identical bytes, but no longer the committed regular file
+    extra_dir = tmp_path / "extra"
+    extra_dir.mkdir()
+    (extra_dir / "added.json").write_text("{}", encoding="utf-8")
+    (root / "research/results/experiment_A/linked").symlink_to(extra_dir, target_is_directory=True)
+    problems = _script().check(MANIFEST, root)
+    assert "symlink research/TRACEFORGE_TECHNICAL_REPORT.md" in problems
+    assert "symlink research/results/experiment_A/linked" in problems
+    _files, links = _entries_under(root, "research/results/experiment_A")
+    assert "research/results/experiment_A/linked" in links

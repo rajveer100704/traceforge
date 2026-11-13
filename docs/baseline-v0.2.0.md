@@ -46,8 +46,10 @@ this in CI:
 - historical result directories may not gain files;
 - every bundle must verify;
 - each bundle's own `files_sha256` must agree with the manifest;
-- the manifest must equal the tag's blobs (skipped when the tag is not fetched, e.g. in CI's
-  shallow clone).
+- protected paths must be regular files: symlinks are rejected, and directory scans do not
+  follow them;
+- the manifest must equal the tag's blobs. CI fetches the `v0.2.0` tag, and on GitHub
+  Actions a missing tag fails the test; local clones without tags skip it.
 
 New results go in new directories.
 
