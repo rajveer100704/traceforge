@@ -115,6 +115,50 @@ def test_partial_pricing_is_rejected() -> None:
         ProviderConfig(price_per_1k_prompt=-1.0, price_per_1k_completion=0.0)
 
 
+@pytest.mark.parametrize(
+    "bad", [float("inf"), float("-inf"), float("nan")], ids=["inf", "-inf", "nan"]
+)
+def test_non_finite_config_prices_are_rejected(bad: float) -> None:
+    """Review #2: an infinite or NaN price could yield a NaN cost that never trips a budget."""
+    with pytest.raises(ValueError):
+        ProviderConfig(price_per_1k_prompt=bad, price_per_1k_completion=0.0)
+    with pytest.raises(ValueError):
+        ProviderConfig(price_per_1k_prompt=0.0, price_per_1k_completion=bad)
+
+
+@pytest.mark.parametrize(
+    ("prompt", "completion"),
+    [
+        (-1.0, 0.0),
+        (0.0, -0.01),
+        (float("inf"), 0.0),
+        (0.0, float("nan")),
+        (1.0, None),
+        (None, 1.0),
+        (True, 1.0),
+    ],
+    ids=[
+        "negative-prompt",
+        "negative-completion",
+        "inf",
+        "nan",
+        "prompt-only",
+        "completion-only",
+        "bool",
+    ],
+)
+def test_direct_provider_construction_validates_prices(prompt: Any, completion: Any) -> None:
+    """Review #8: the constructor enforces the same rules as ProviderConfig."""
+    with pytest.raises(ValueError):
+        _provider(price_per_1k_prompt=prompt, price_per_1k_completion=completion)
+
+
+def test_direct_provider_construction_accepts_valid_prices() -> None:
+    assert _provider(price_per_1k_prompt=0.0, price_per_1k_completion=0.0).pricing_known
+    assert _provider(price_per_1k_prompt=0.5, price_per_1k_completion=1.5).pricing_known
+    assert not _provider().pricing_known
+
+
 def test_provider_reported_cost_is_authoritative() -> None:
     with respx.mock:
         respx.post(f"{URL}/chat/completions").mock(
@@ -139,18 +183,86 @@ def test_absent_usage_is_not_reported_and_cost_unknown() -> None:
     "usage",
     [
         {"prompt_tokens": 10},
-        {"prompt_tokens": "10", "completion_tokens": 5},
-        {"prompt_tokens": -1, "completion_tokens": 5},
+        {"completion_tokens": 7},
+        {"prompt_tokens": 10, "completion_tokens": None},
+        {},
     ],
-    ids=["missing-completion", "non-integer", "negative"],
+    ids=["missing-completion", "missing-prompt", "null-completion", "empty-usage"],
 )
-def test_incomplete_or_invalid_usage_is_not_reported(usage: dict[str, Any]) -> None:
+def test_partial_usage_is_not_reported_and_both_counts_are_discarded(
+    usage: dict[str, Any],
+) -> None:
+    """Review #16: a partial report is discarded entirely (both counts 0), never half-used."""
     with respx.mock:
         respx.post(f"{URL}/chat/completions").mock(return_value=_ok(usage))
         gen = asyncio.run(
             _generate(_provider(price_per_1k_prompt=1.0, price_per_1k_completion=1.0))
         )
     assert not gen.usage_reported and gen.cost_usd is None
+    assert gen.prompt_tokens == 0 and gen.completion_tokens == 0
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"prompt_tokens": "10", "completion_tokens": 5},
+        {"prompt_tokens": 10.0, "completion_tokens": 5},
+        {"prompt_tokens": True, "completion_tokens": 5},
+        {"prompt_tokens": -1, "completion_tokens": 5},
+        {"prompt_tokens": 10, "completion_tokens": 10**9 + 1},
+        {"prompt_tokens": 10**400, "completion_tokens": 5},
+        ["not", "an", "object"],
+    ],
+    ids=["string", "float", "bool", "negative", "over-cap", "overflow", "usage-not-object"],
+)
+def test_invalid_usage_values_are_malformed_responses(usage: Any) -> None:
+    """Review #10: present-but-invalid or overflowing counts are classified, never a crash."""
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(
+            return_value=httpx.Response(
+                200, json={"choices": [{"message": {"content": "x"}}], "usage": usage}
+            )
+        )
+        with pytest.raises(ProviderCallFailed) as err:
+            asyncio.run(_generate(_provider(price_per_1k_prompt=1.0, price_per_1k_completion=1.0)))
+    assert err.value.details["failure"] == "malformed_response"
+
+
+@pytest.mark.parametrize(
+    "cost",
+    ["0.01", -0.5, 10**400, True],
+    ids=["string", "negative", "overflow-int", "bool"],
+)
+def test_invalid_reported_cost_makes_cost_unknown(cost: Any) -> None:
+    """Review #11: an invalid usage.cost is handled safely: the call succeeds, the cost is
+    unknown (no fallback to a price estimate the provider contradicted), never zero."""
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(
+            return_value=_ok({"prompt_tokens": 10, "completion_tokens": 5, "cost": cost})
+        )
+        gen = asyncio.run(
+            _generate(_provider(price_per_1k_prompt=1.0, price_per_1k_completion=1.0))
+        )
+    assert gen.usage_reported and gen.prompt_tokens == 10 and gen.cost_usd is None
+
+
+@pytest.mark.parametrize("literal", ["Infinity", "-Infinity", "NaN"])
+def test_non_finite_reported_cost_makes_cost_unknown(literal: str) -> None:
+    """Review #11: non-standard JSON literals (accepted by Python's parser) in usage.cost."""
+    body = (
+        '{"choices": [{"message": {"content": "x"}}], '
+        f'"usage": {{"prompt_tokens": 10, "completion_tokens": 5, "cost": {literal}}}}}'
+    )
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(
+            return_value=httpx.Response(
+                200, content=body.encode(), headers={"content-type": "application/json"}
+            )
+        )
+        gen = asyncio.run(
+            _generate(_provider(price_per_1k_prompt=1.0, price_per_1k_completion=1.0))
+        )
+    assert gen.usage_reported and gen.cost_usd is None
 
 
 def test_finish_reason_absent_is_none_and_length_is_kept() -> None:
@@ -167,13 +279,41 @@ def test_finish_reason_absent_is_none_and_length_is_kept() -> None:
 # ------------------------------------------------------------------ retries and classified failures
 
 
-def test_retry_then_success_records_attempts_and_duration() -> None:
+def test_retry_then_success_records_attempts_duration_and_unknown_cost() -> None:
+    """Review #15: with an injected, deterministic 0.3 s retry delay the recorded duration must
+    include it (a regression measuring only the final attempt would fail). Review #3: after a
+    retry the total cost is unknown, even with known prices and reported usage."""
+    from tenacity import wait_fixed
+
     with respx.mock:
         route = respx.post(f"{URL}/chat/completions")
         route.side_effect = [httpx.Response(429), _ok({"prompt_tokens": 1, "completion_tokens": 1})]
-        gen = asyncio.run(_generate(_provider(max_attempts=3)))
-    assert route.call_count == 2
-    assert gen.attempts == 2 and gen.request_seconds is not None and gen.request_seconds > 0
+        gen = asyncio.run(
+            _generate(
+                _provider(
+                    max_attempts=3,
+                    retry_wait=wait_fixed(0.3),
+                    price_per_1k_prompt=1.0,
+                    price_per_1k_completion=1.0,
+                )
+            )
+        )
+    assert route.call_count == 2 and gen.attempts == 2
+    assert gen.request_seconds is not None and gen.request_seconds >= 0.3
+    assert gen.usage_reported and gen.prompt_tokens == 1  # this response's usage is still kept
+    assert gen.cost_usd is None  # earlier attempt may have been billed
+
+
+def test_single_attempt_keeps_known_cost() -> None:
+    """Counterpart to review #3: without a retry, the known cost is kept."""
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(
+            return_value=_ok({"prompt_tokens": 1000, "completion_tokens": 0})
+        )
+        gen = asyncio.run(
+            _generate(_provider(price_per_1k_prompt=0.5, price_per_1k_completion=0.5))
+        )
+    assert gen.attempts == 1 and gen.cost_usd == pytest.approx(0.5)
 
 
 @pytest.mark.parametrize(
@@ -192,6 +332,13 @@ def test_retry_then_success_records_attempts_and_duration() -> None:
             1,
         ),
         ([httpx.Response(200, json=["not", "an", "object"])], "malformed_response", 200, 1),
+        ([httpx.Response(200, json={"choices": [{}]})], "malformed_response", 200, 1),
+        (
+            [httpx.Response(200, json={"choices": [{"message": None}]})],
+            "malformed_response",
+            200,
+            1,
+        ),
     ],
     ids=[
         "429-exhausted",
@@ -202,6 +349,8 @@ def test_retry_then_success_records_attempts_and_duration() -> None:
         "message-not-object",
         "tool-call-not-object",
         "body-is-list",
+        "message-missing",
+        "message-null",
     ],
 )
 def test_failures_are_classified(
@@ -292,7 +441,24 @@ def test_budget_fails_closed_on_unknown_cost() -> None:
     assert b.exhausted() == "max_cost_unverifiable"
     unlimited = BudgetManager(ResourceBudget())  # max_cost_usd = 0 disables the cost budget
     unlimited.charge_generation(10, None)
-    assert unlimited.exhausted() is None
+    assert unlimited.exhausted() is None and unlimited.cost_exhausted() is None
+
+
+def test_unknown_cost_takes_precedence_over_token_limit() -> None:
+    """Review #9: when one generation both exhausts the token limit and has unknown cost under an
+    active cost budget, the stop reason is the unverifiable cost, not the token limit."""
+    from traceforge.contracts.tasks import ResourceBudget
+
+    b = BudgetManager(ResourceBudget(max_cost_usd=1.0, max_tokens=100))
+    b.charge_generation(500, None)
+    assert b.exhausted() == "max_cost_unverifiable"
+    assert b.cost_exhausted() == "max_cost_unverifiable"
+    no_cost_budget = BudgetManager(ResourceBudget(max_tokens=100))
+    no_cost_budget.charge_generation(500, None)
+    assert no_cost_budget.exhausted() == "max_tokens"  # unchanged without a cost budget
+    known = BudgetManager(ResourceBudget(max_cost_usd=1.0, max_tokens=100))
+    known.charge_generation(500, 0.1)
+    assert known.exhausted() == "max_tokens"  # known cost below the limit: token stop as before
 
 
 class _Fake:
@@ -301,9 +467,16 @@ class _Fake:
     model_revision = "r0"
     trusted = True
 
-    def __init__(self, gens: list[Generation | BaseException | float], pricing_known: bool = True):
+    def __init__(
+        self,
+        gens: list[Generation | BaseException | float],
+        pricing_known: bool = True,
+        trusted: bool = True,
+    ):
         self._items = list(gens)
         self.pricing_known = pricing_known
+        self.trusted = trusted
+        self.closed = False
 
     async def generate(self, messages: Any, tools: Any, config: Any) -> Generation:
         item = self._items.pop(0)
@@ -315,7 +488,7 @@ class _Fake:
         return item
 
     async def aclose(self) -> None:
-        return None
+        self.closed = True
 
 
 def _episode(
@@ -420,6 +593,20 @@ def test_cost_budget_refused_without_known_pricing(registry: Any, sandbox: Any) 
     with pytest.raises(CapabilityUnavailable, match="cannot be enforced"):
         _episode(registry, sandbox, provider, max_cost=1.0)
     assert provider._items == []  # nothing was generated
+    assert provider.closed  # review #4: the refused provider's client is released
+
+
+def test_trust_refusal_closes_provider(registry: Any, sandbox: Any) -> None:
+    """Review #4: the trust preflight refusal also releases the provider."""
+    assert sandbox.trusted_code_only
+    provider = _Fake([], trusted=False)
+    with pytest.raises(CapabilityUnavailable, match="trusted demo policies"):
+        _episode(registry, sandbox, provider)
+    assert provider.closed
+
+
+def _tools(result: Any) -> list[Any]:
+    return [s for s in result.trajectory.steps if s.role.value == "tool"]
 
 
 def test_cost_budget_stops_episode_when_a_cost_is_unknown(registry: Any, sandbox: Any) -> None:
@@ -430,6 +617,29 @@ def test_cost_budget_stops_episode_when_a_cost_is_unknown(registry: Any, sandbox
     result = _episode(registry, sandbox, _Fake(gens), max_cost=1.0)
     assert result.episode.termination_reason == "budget:max_cost_unverifiable"
     assert len(_assistant(result)) == 1
+    assert _tools(result) == []  # review #1: its tool call never ran
+
+
+def test_cost_overrun_stops_before_tool_calls_run(registry: Any, sandbox: Any) -> None:
+    """Review #1: a generation that crosses the cost limit stops the episode before its tool
+    calls execute (previously they ran and the stop only happened at the next turn)."""
+    gens: list[Generation | BaseException | float] = [
+        Generation("", READ, 10, 5, 0.05, "tool_calls", usage_reported=True),
+        Generation("never", (), 0, 0, 0.0, "stop"),
+    ]
+    result = _episode(registry, sandbox, _Fake(gens), max_cost=0.03)
+    assert result.episode.termination_reason == "budget:max_cost"
+    assert len(_assistant(result)) == 1 and _tools(result) == []
+
+
+def test_cost_stop_is_not_masked_by_no_tool_calls(registry: Any, sandbox: Any) -> None:
+    """Review #1: a final answer with unknown cost under a cost budget is a budget stop, not
+    a normal 'no_tool_calls' finish."""
+    gens: list[Generation | BaseException | float] = [
+        Generation("done", (), 10, 5, None, "stop", usage_reported=True),
+    ]
+    result = _episode(registry, sandbox, _Fake(gens), max_cost=1.0)
+    assert result.episode.termination_reason == "budget:max_cost_unverifiable"
 
 
 def test_cost_is_charged_once_per_generation(registry: Any, sandbox: Any) -> None:
@@ -472,6 +682,75 @@ def test_generation_stats_reads_pre_v03_trajectories(registry: Any, sandbox: Any
     assert stats["cost_usd"] is None and stats["n_requests_cost_known"] == 0
     assert stats["provider_attempts"] is None and stats["finish_reasons"] == {"not_reported": 1}
     assert len(stats["generation_request_seconds"]) == 1  # falls back to step timing
+
+
+def test_provider_raised_timeout_is_not_a_runner_deadline(registry: Any, sandbox: Any) -> None:
+    """Review #5: a TimeoutError raised by the provider before the runner's deadline expires is
+    recorded as a provider failure (failure_source=provider), not as the runner deadline."""
+    result = _episode(
+        registry, sandbox, _Fake([TimeoutError("provider-side timeout")]), timeout=5.0
+    )
+    (step,) = _assistant(result)
+    assert result.episode.termination_reason == "provider_timeout"  # unchanged reason
+    assert step.metadata["provider_failure"] == "timeout"
+    assert step.metadata["failure_source"] == "provider"
+    assert step.metadata["request_seconds"] < 5.0
+
+
+@pytest.mark.parametrize("details", ["oops", ["attempts", 3], 7], ids=["str", "list", "int"])
+def test_non_dict_exception_details_are_ignored(registry: Any, sandbox: Any, details: Any) -> None:
+    """Review #12: a provider exception with a non-dict `details` attribute must not break
+    failure handling; the failure step is still recorded."""
+    exc = RuntimeError("weird provider error")
+    exc.details = details  # type: ignore[attr-defined]
+    result = _episode(registry, sandbox, _Fake([exc]))
+    (step,) = _assistant(result)
+    assert result.episode.termination_reason == "provider_error"
+    assert step.metadata["provider_failure"] == "other"
+    assert step.metadata["attempts"] is None and step.metadata["http_status"] is None
+
+
+def test_attempt_totals_are_unknown_when_any_request_count_is_unknown(
+    registry: Any, sandbox: Any
+) -> None:
+    """Review #13: a known count (2 attempts) followed by a runner-deadline timeout (attempts
+    unknown) must not yield a total that looks complete."""
+    gens: list[Generation | BaseException | float] = [
+        Generation("", READ, 1, 1, 0.0, "tool_calls", usage_reported=True, attempts=2),
+        5.0,
+    ]
+    stats = generation_stats(_episode(registry, sandbox, _Fake(gens), timeout=0.2).trajectory)
+    assert stats["n_generation_requests"] == 2 and stats["n_requests_attempts_known"] == 1
+    assert stats["provider_attempts"] is None and stats["provider_retries"] is None
+
+
+def test_generation_infers_usage_reported_for_older_providers() -> None:
+    """Review #14: providers written before v0.3 that set token counts but not usage_reported
+    keep their usage; zero counts alone are not 'reported'; an explicit value always wins."""
+    assert Generation("x", (), 5, 3).usage_reported is True
+    assert Generation("x", (), 0, 2).usage_reported is True
+    assert Generation("x", ()).usage_reported is False
+    assert Generation("x", (), 5, 3, usage_reported=False).usage_reported is False
+    assert Generation("x", (), 0, 0, usage_reported=True).usage_reported is True
+
+
+def test_older_provider_usage_reaches_the_trajectory(registry: Any, sandbox: Any) -> None:
+    """Review #14, end to end: counts from a provider that never sets usage_reported are kept."""
+    gens: list[Generation | BaseException | float] = [Generation("done", (), 12, 4, 0.0, "stop")]
+    result = _episode(registry, sandbox, _Fake(gens))
+    (step,) = _assistant(result)
+    assert step.token_usage is not None and step.token_usage.prompt_tokens == 12
+    assert generation_stats(result.trajectory)["prompt_tokens"] == 12
+
+
+def test_model_provider_protocol_declares_pricing_known() -> None:
+    """Review #7: pricing_known is part of the provider contract; both in-repo providers
+    implement it."""
+    from traceforge.domain.ports import ModelProvider
+
+    assert "pricing_known" in dir(ModelProvider)
+    assert ScriptedDemoProvider("reference").pricing_known is True
+    assert _provider().pricing_known is False
 
 
 def test_demo_provider_is_free_and_reports_no_usage() -> None:

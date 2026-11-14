@@ -13,6 +13,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from traceforge.contracts.actions import ToolCall
@@ -36,7 +37,7 @@ def _failure_kind(exc: BaseException, details: dict[str, Any]) -> str:
     """Classify a failed generation call. Provider failures are not verifier outcomes."""
     kind = details.get("failure")
     if isinstance(kind, str) and kind:
-        return kind
+        return kind[:40]
     if isinstance(exc, TimeoutError) or "Timeout" in type(exc).__name__:
         return "timeout"
     return "other"
@@ -94,14 +95,20 @@ class AgentRunner:
         env_policy: EnvironmentPolicy | None = None,
         cancel: CancelToken | None = None,
     ) -> EpisodeResult:
-        self.check_trust(provider)
-        if spec.budget.max_cost_usd > 0 and not getattr(provider, "pricing_known", False):
-            # A cost budget that cannot be measured must not be silently unenforced.
-            raise CapabilityUnavailable(
-                f"task budget max_cost_usd={spec.budget.max_cost_usd} cannot be enforced: provider "
-                f"'{provider.kind}' has no known pricing (set provider.price_per_1k_prompt and "
-                "price_per_1k_completion; 0.0 means free)"
-            )
+        try:
+            self.check_trust(provider)
+            # Fail closed: a cost budget that cannot be measured must not be silently unenforced.
+            # getattr: a provider object that predates the pricing_known contract is unpriced.
+            if spec.budget.max_cost_usd > 0 and not getattr(provider, "pricing_known", False):
+                raise CapabilityUnavailable(
+                    f"task budget max_cost_usd={spec.budget.max_cost_usd} cannot be enforced: "
+                    f"provider '{provider.kind}' has no known pricing (set "
+                    "provider.price_per_1k_prompt and price_per_1k_completion; 0.0 means free)"
+                )
+        except BaseException:
+            # A refused episode never reaches the main try/finally: release the provider here.
+            await provider.aclose()
+            raise
         generation = generation or GenerationConfig()
         metadata: dict[str, JSONValue] = {
             "provider_kind": provider.kind,
@@ -158,6 +165,35 @@ class AgentRunner:
             trajectory=trajectory, episode=episode, cleanup_error=cleanup_error, metadata=metadata
         )
 
+    @staticmethod
+    def _record_provider_failure(
+        recorder: TrajectoryRecorder,
+        started: datetime,
+        t0: float,
+        exc: BaseException,
+        kind: str | None,
+    ) -> None:
+        """Record a failed generation call raised by the provider (not the runner deadline)."""
+        raw = getattr(exc, "details", None)
+        details: dict[str, Any] = raw if isinstance(raw, dict) else {}  # untrusted attribute
+        recorder.message(
+            StepRole.ASSISTANT,
+            "",
+            started_at=started,
+            metadata={
+                "error": f"{type(exc).__name__}: {str(exc)[:300]}",
+                "provider_failure": kind or _failure_kind(exc, details),
+                "failure_source": "provider",
+                "attempts": _int_or_none(details.get("attempts")),
+                "http_status": _int_or_none(details.get("status")),
+                "request_seconds": round(time.perf_counter() - t0, 6),
+                "usage_reported": False,
+                # A failed call may still have been billed; its cost is unknown.
+                "cost_usd": None,
+                "finish_reason": None,
+            },
+        )
+
     async def _loop(
         self,
         env: TaskEnvironment,
@@ -183,11 +219,17 @@ class AgentRunner:
             started = utc_now()
             t0 = time.perf_counter()
             timeout = max(0.1, min(generation.timeout_seconds, env.remaining_seconds()))
+            deadline = asyncio.timeout(timeout)
             try:
-                gen = await asyncio.wait_for(
-                    provider.generate(messages, tools, generation), timeout
-                )
-            except TimeoutError:
+                async with deadline:
+                    gen = await provider.generate(messages, tools, generation)
+            except TimeoutError as exc:
+                if not deadline.expired():
+                    # The provider itself raised TimeoutError before the runner's deadline:
+                    # a provider failure, not a runner deadline.
+                    env.terminate("provider_timeout")
+                    self._record_provider_failure(recorder, started, t0, exc, "timeout")
+                    return
                 # The runner's own deadline (per-call timeout or remaining wall clock) expired
                 # while the provider was still working; its attempt count is unknown.
                 env.terminate("provider_timeout")
@@ -210,24 +252,7 @@ class AgentRunner:
                 return
             except Exception as exc:
                 env.terminate("provider_error")
-                details = getattr(exc, "details", None) or {}
-                recorder.message(
-                    StepRole.ASSISTANT,
-                    "",
-                    started_at=started,
-                    metadata={
-                        "error": f"{type(exc).__name__}: {str(exc)[:300]}",
-                        "provider_failure": _failure_kind(exc, details),
-                        "failure_source": "provider",
-                        "attempts": _int_or_none(details.get("attempts")),
-                        "http_status": _int_or_none(details.get("status")),
-                        "request_seconds": round(time.perf_counter() - t0, 6),
-                        "usage_reported": False,
-                        # A failed call may still have been billed; its cost is unknown.
-                        "cost_usd": None,
-                        "finish_reason": None,
-                    },
-                )
+                self._record_provider_failure(recorder, started, t0, exc, None)
                 return
             budget.charge_generation(gen.prompt_tokens + gen.completion_tokens, gen.cost_usd)
             encoded_calls = tuple(
@@ -265,6 +290,13 @@ class AgentRunner:
                     "cost_usd": gen.cost_usd,
                 },
             )
+            # Re-check the cost budget right after charging: a generation that exceeds it, or
+            # whose cost is unknown under an active cost limit, stops the episode before its tool
+            # calls run (and before "no_tool_calls" could mask the budget stop).
+            cost_stop = budget.cost_exhausted()
+            if cost_stop:
+                env.terminate(f"budget:{cost_stop}")
+                return
             messages.append(
                 ChatMessage(role="assistant", content=gen.content, tool_calls=encoded_calls)
             )

@@ -240,8 +240,10 @@ def generation_stats(trajectory: Trajectory) -> dict[str, JSONValue]:
         "cost_usd": round(cost_total, 10) if with_cost == requests else None,
         "generation_request_seconds": request_seconds,
         "n_requests_attempts_known": attempts_known,
-        "provider_attempts": attempts_total if attempts_known else None,
-        "provider_retries": retries if attempts_known else None,
+        # Like cost: totals only when every request's attempt count is known (a partial sum
+        # would understate attempts and look complete). Coverage is n_requests_attempts_known.
+        "provider_attempts": attempts_total if attempts_known == requests else None,
+        "provider_retries": retries if attempts_known == requests else None,
         "finish_reasons": finish_reasons,
         "provider_failure": failure,
         "provider_failure_source": failure_source,

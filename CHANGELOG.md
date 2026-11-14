@@ -24,6 +24,21 @@
   no known pricing, and ends with `budget:max_cost_unverifiable` if any call's cost is unknown.
 - The scripted demo provider is explicitly free (`cost_usd=0.0`) and still reports no token
   usage. Its results remain infrastructure validation, not learned-model evidence.
+- Review follow-ups (PR #6):
+  - The cost budget is re-checked right after each generation; a call that exceeds it or has
+    unknown cost stops the episode before its tool calls run. Unknown cost takes precedence
+    over the token limit.
+  - After any retry the call's cost is unknown, since earlier attempts may have been billed.
+  - Prices must be finite and non-negative, in `ProviderConfig` and in the provider
+    constructor.
+  - Present-but-invalid or overflowing token counts, and a missing, null or non-object
+    `message`, are `malformed_response`. An invalid `usage.cost` makes the cost unknown.
+  - A `TimeoutError` raised by the provider is recorded as a provider failure, not the
+    runner's deadline. Exception `details` are used only when they are a dict.
+  - Preflight refusals (trust, unpriced cost budget) close the provider's HTTP client.
+  - `pricing_known` is part of the `ModelProvider` interface. `Generation.usage_reported`
+    defaults to inference from non-zero counts, for providers written before v0.3.
+  - Episode attempt and retry totals are `None` unless every request's count is known.
 
 ### Added
 - `research/HISTORICAL_SHA256SUMS`: SHA-256 of every protected historical artifact (v0.2.0

@@ -33,8 +33,8 @@ class ProviderConfig(FrozenModel):
     prompt_template_version: str = "agent-v1"
     # USD per 1K tokens. None = pricing unknown (cost is reported as unknown, never as $0);
     # 0.0 = explicitly free (e.g. a self-hosted endpoint). Set both or neither.
-    price_per_1k_prompt: float | None = Field(default=None, ge=0)
-    price_per_1k_completion: float | None = Field(default=None, ge=0)
+    price_per_1k_prompt: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    price_per_1k_completion: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def _pricing_complete(self) -> ProviderConfig:
