@@ -10,7 +10,10 @@ benchmark:
   reward_policy: verified-v1
   verifier_profile: v3_full
   sandbox: local
-pricing:              # optional USD per 1K tokens for cost estimates; null = not reported
+# USD per 1K tokens, applied to every model arm's provider unless the arm sets its own prices.
+# Both or neither; null = unknown (cost is reported as unknown, never $0); 0.0 = free.
+# Cost comes from the shared metric aggregation (docs/metrics-contract.md).
+pricing:
   prompt_per_1k: null
   completion_per_1k: null
 arms:

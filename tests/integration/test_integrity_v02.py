@@ -39,7 +39,7 @@ def test_config_hash_backward_compatible() -> None:
     legacy = {
         k: v
         for k, v in cfg.model_dump(mode="json").items()
-        if k not in ("seeds", "run_mode", "training_lineage", "reward_thresholds")
+        if k not in ("seeds", "run_mode", "training_lineage", "reward_thresholds", "report_tier")
     }
     # v0.3 provider pricing fields are hashed only when set (exact pre-v0.3 hash values are
     # pinned in tests/unit/test_provider_telemetry.py).

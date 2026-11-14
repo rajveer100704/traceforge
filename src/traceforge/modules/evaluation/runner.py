@@ -15,7 +15,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from traceforge.contracts.common import ValidationFailure
-from traceforge.contracts.experiments import BenchmarkConfig, RolloutSummary
+from traceforge.contracts.experiments import (
+    FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES,
+    BenchmarkConfig,
+    RolloutSummary,
+)
 from traceforge.contracts.verification import VerifierProfile
 from traceforge.modules.agents.runner import CancelToken
 from traceforge.modules.evaluation.contamination import (
@@ -23,6 +27,7 @@ from traceforge.modules.evaluation.contamination import (
     check_task_splits,
     check_training_overlap,
 )
+from traceforge.modules.evaluation.metric_contract import METRICS_SCHEMA_VERSION
 from traceforge.modules.evaluation.metrics import (
     STATISTICAL_UNITS,
     group_by,
@@ -206,7 +211,27 @@ class BenchmarkRunner:
             ),
             "statistical_units": STATISTICAL_UNITS,
             "evidence": evidence_label(config, runs),
+            "metrics_schema_version": METRICS_SCHEMA_VERSION,
+            "report": report_tier_block(config),
         }
+
+
+def report_tier_block(config: BenchmarkConfig) -> dict[str, Any]:
+    """Which grade of uncertainty estimate the report carries (opt-in v0.3 report tier)."""
+    final = config.report_tier == "final"
+    return {
+        "tier": config.report_tier,
+        "bootstrap_samples": config.bootstrap_samples,
+        "final_min_bootstrap_samples": FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES,
+        "note": (
+            "Final report: official run mode with at least "
+            f"{FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES} bootstrap resamples."
+            if final
+            else f"Development-grade intervals ({config.bootstrap_samples} bootstrap resamples); "
+            f"final reports require report_tier 'final' (official mode, >= "
+            f"{FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES} resamples)."
+        ),
+    }
 
 
 SCRIPTED_LABEL = (

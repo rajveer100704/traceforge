@@ -6,9 +6,12 @@ Plan: `docs/plans/v0.3-research-execution.md`. Baseline audit: `docs/baseline-v0
 
 | Milestone | Status |
 |---|---|
-| PR 0 baseline audit (historical manifest + integrity tests, docs consistency) | in review |
-| S1 container CVE / SQLite security investigation | in progress (separate PR) |
-| Metric contract and telemetry; paired comparison; pre-registration and power | not started |
+| PR 0 baseline audit (historical manifest + integrity tests, docs consistency) | merged (#4) |
+| S1 container CVE / SQLite security investigation | merged (#5) |
+| PR 1A provider pricing and generation telemetry | merged (#6) |
+| PR 1B metric contract and reporting (schema 2, coverage, cost, latency, finite JSON, report tier) | in review |
+| PR 2 paired benchmark comparison | not started |
+| PR 3 benchmark v2 and task diversity | not started |
 | Benchmark v2, determinism, out-of-process verifier, red-team v1.2 | not started |
 | Real SFT (Experiment F) and GRPO (Experiment G) | NOT EXECUTED (no GPU or endpoint) |
 
