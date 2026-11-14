@@ -37,6 +37,33 @@ when labelled ground truth exists. Breakdowns by split, family and difficulty pl
 Proportions use **Wilson score intervals** (95 % default) with explicit `n`. With ≤ 39 tasks, intervals
 are wide; reports state that no significance claims are made.
 
+### Provider pricing and generation telemetry (v0.3)
+
+- **Pricing:** `provider.price_per_1k_prompt` / `price_per_1k_completion`, in USD. `null` (the
+  default) means unknown, and cost is then reported as unknown, not $0. `0.0` means explicitly
+  free. Set both or neither; prices must be finite and non-negative (enforced in the config
+  and in the provider constructor). A cost reported by the provider (`usage.cost`) takes
+  precedence; an invalid reported cost makes the cost unknown rather than falling back to the
+  price estimate. After any retry the call's total cost is unknown, because earlier attempts
+  may have been billed and a response only reports its own cost.
+- **Usage:** reported only when both token counts are present (a partial report is discarded
+  entirely). Counts that are present but not integers in [0, 10^9] make the response
+  `malformed_response`. Providers that predate v0.3 and set counts without `usage_reported`
+  have usage inferred from non-zero counts.
+- **Telemetry per generation step:** whether usage was reported, cost, finish reason, request
+  seconds (including retries), HTTP attempts, and, for failed calls, the failure kind
+  (`timeout`, `rate_limited`, `server_error`, `http_error`, `transport_error`,
+  `malformed_response`, `other`) and whether the runner's deadline expired. Provider failures
+  are infrastructure or model-access outcomes, not verifier outcomes.
+- **Cost budgets** (`max_cost_usd > 0`) fail closed: the episode is refused without known
+  pricing (and the provider is closed), and the budget is re-checked right after each
+  generation, so a call that exceeds it (`budget:max_cost`) or has unknown cost
+  (`budget:max_cost_unverifiable`) stops the episode before its tool calls run. Unknown cost
+  takes precedence over the token limit. A timeout raised by the provider itself is recorded
+  as a provider failure, distinct from the runner's own deadline.
+- Benchmark reports do not yet aggregate cost, latency percentiles or telemetry coverage (v0.3
+  PR 1B). Until then, the "token usage/cost" line above means token totals only.
+
 ## Contamination controls
 
 Hidden tests are never exposed; oracle bundles are stored under a restricted prefix; the agent only

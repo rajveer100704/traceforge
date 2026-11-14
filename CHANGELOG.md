@@ -2,7 +2,46 @@
 
 ## Unreleased
 
-## Unreleased
+### Changed (v0.3 PR 1A: provider pricing and telemetry integrity)
+- `ProviderConfig` gains `price_per_1k_prompt` / `price_per_1k_completion` (USD per 1K tokens).
+  `None` = pricing unknown, `0.0` = explicitly free; set both or neither. The factory now passes
+  them to the OpenAI-compatible provider. Before this, configured prices could not reach the
+  provider, so every call was costed at $0. Unset fields are excluded from `config_hash`, so
+  existing benchmark hashes are unchanged (pinned by golden tests).
+- Generations record whether usage was reported, cost (`None` when unknown, never folded into
+  $0), finish reason (`None` when not reported), request seconds and HTTP attempts. Token usage
+  is attached to a trajectory step only when the provider reported it.
+- Failed calls raise `ProviderCallFailed` (a `ProviderError`), classified as `timeout`,
+  `rate_limited`, `server_error`, `http_error`, `transport_error` or `malformed_response`, with
+  attempts, last status and seconds. The runner records the kind, and whether its own deadline
+  expired, on the failing step. Termination reasons are unchanged (`provider_timeout`,
+  `provider_error`).
+- Rollout metadata adds per-episode generation telemetry: request count, usage and cost
+  coverage, episode cost (`None` if any request's cost is unknown), per-request seconds, attempts
+  and retries, finish-reason counts and provider failure. Aggregation and reporting follow in
+  PR 1B.
+- Cost budgets fail closed. An episode with `max_cost_usd > 0` is refused when the provider has
+  no known pricing, and ends with `budget:max_cost_unverifiable` if any call's cost is unknown.
+- The scripted demo provider is explicitly free (`cost_usd=0.0`) and still reports no token
+  usage. Its results remain infrastructure validation, not learned-model evidence.
+- Review follow-ups (PR #6):
+  - The cost budget is re-checked right after each generation; a call that exceeds it or has
+    unknown cost stops the episode before its tool calls run. Unknown cost takes precedence
+    over the token limit.
+  - After any retry the call's cost is unknown, since earlier attempts may have been billed.
+  - Prices must be finite and non-negative, in `ProviderConfig` and in the provider
+    constructor.
+  - Present-but-invalid or overflowing token counts, and a missing, null or non-object
+    `message`, are `malformed_response`. An invalid `usage.cost` makes the cost unknown.
+  - A `TimeoutError` raised by the provider is recorded as a provider failure, not the
+    runner's deadline. Exception `details` are used only when they are a dict.
+  - Preflight refusals (trust, unpriced cost budget) close the provider's HTTP client.
+  - `pricing_known` is part of the `ModelProvider` interface. `Generation.usage_reported`
+    defaults to inference from non-zero counts, for providers written before v0.3.
+  - Episode attempt and retry totals are `None` unless every request's count is known.
+  - Tool-call `arguments` must be a string or an object (null, numbers, booleans and lists
+    are `malformed_response` instead of crashing the runner). JSON nested too deeply to parse
+    is `malformed_response`. Boolean prices are rejected by `ProviderConfig`.
 
 ### Added
 - `research/HISTORICAL_SHA256SUMS`: SHA-256 of every protected historical artifact (v0.2.0

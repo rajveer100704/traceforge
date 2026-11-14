@@ -10,6 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass
 
+from traceforge.contracts.common import JSONValue
 from traceforge.contracts.experiments import ProviderConfig, RolloutSummary
 from traceforge.contracts.observations import EpisodeRecord
 from traceforge.contracts.rewards import RewardBreakdown
@@ -172,20 +173,78 @@ class RolloutExecutor:
         )
 
 
-def generation_stats(trajectory: Trajectory) -> dict[str, int | float]:
-    """Token usage and model latency recorded on assistant steps (zero for the demo provider)."""
+def generation_stats(trajectory: Trajectory) -> dict[str, JSONValue]:
+    """Per-episode generation telemetry captured from assistant steps.
+
+    ``prompt_tokens``/``completion_tokens``/``generation_seconds`` keep their v0.2 meaning (sums
+    over steps; tokens only from steps whose usage was reported). Everything else records what
+    was and was not measured, so aggregation can report coverage instead of treating missing
+    values as zero: request counts, how many reported usage or a known cost, the episode cost
+    (None if any request's cost is unknown), per-request latencies, attempts/retries, finish
+    reasons and any provider failure.
+    """
     prompt = completion = 0
     seconds = 0.0
+    requests = with_usage = with_cost = attempts_known = 0
+    cost_total = 0.0
+    attempts_total = retries = 0
+    request_seconds: list[JSONValue] = []
+    finish_reasons: dict[str, JSONValue] = {}
+    failure: JSONValue = None
+    failure_source: JSONValue = None
     for step in trajectory.steps:
         if step.role.value != "assistant":
             continue
+        md = step.metadata
+        requests += 1
         if step.token_usage is not None:
             prompt += step.token_usage.prompt_tokens
             completion += step.token_usage.completion_tokens
         if step.completed_at is not None:
-            seconds += (step.completed_at - step.started_at).total_seconds()
+            elapsed = (step.completed_at - step.started_at).total_seconds()
+            seconds += elapsed
+        else:
+            elapsed = None
+        if md.get("usage_reported", step.token_usage is not None):
+            with_usage += 1
+        cost = md.get("cost_usd")
+        if isinstance(cost, int | float) and not isinstance(cost, bool):
+            with_cost += 1
+            cost_total += float(cost)
+        measured = md.get("request_seconds")
+        if isinstance(measured, int | float) and not isinstance(measured, bool):
+            request_seconds.append(round(float(measured), 6))
+        elif elapsed is not None:
+            request_seconds.append(round(elapsed, 6))
+        n_attempts = md.get("attempts")
+        if isinstance(n_attempts, int) and not isinstance(n_attempts, bool):
+            attempts_known += 1
+            attempts_total += n_attempts
+            retries += max(n_attempts - 1, 0)
+        reason = md.get("finish_reason")
+        key = str(reason) if reason is not None else "not_reported"
+        if md.get("provider_failure") is None:
+            count = finish_reasons.get(key, 0)
+            finish_reasons[key] = (count if isinstance(count, int) else 0) + 1
+        else:
+            failure = md.get("provider_failure")
+            failure_source = md.get("failure_source")
     return {
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "generation_seconds": round(seconds, 6),
+        "n_generation_requests": requests,
+        "n_requests_usage_reported": with_usage,
+        "n_requests_cost_known": with_cost,
+        # Unknown cost is never folded into a total: None unless every request's cost is known.
+        "cost_usd": round(cost_total, 10) if with_cost == requests else None,
+        "generation_request_seconds": request_seconds,
+        "n_requests_attempts_known": attempts_known,
+        # Like cost: totals only when every request's attempt count is known (a partial sum
+        # would understate attempts and look complete). Coverage is n_requests_attempts_known.
+        "provider_attempts": attempts_total if attempts_known == requests else None,
+        "provider_retries": retries if attempts_known == requests else None,
+        "finish_reasons": finish_reasons,
+        "provider_failure": failure,
+        "provider_failure_source": failure_source,
     }

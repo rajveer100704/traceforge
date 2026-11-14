@@ -41,6 +41,13 @@ def test_config_hash_backward_compatible() -> None:
         for k, v in cfg.model_dump(mode="json").items()
         if k not in ("seeds", "run_mode", "training_lineage", "reward_thresholds")
     }
+    # v0.3 provider pricing fields are hashed only when set (exact pre-v0.3 hash values are
+    # pinned in tests/unit/test_provider_telemetry.py).
+    legacy["provider"] = {
+        k: v
+        for k, v in legacy["provider"].items()
+        if k not in ("price_per_1k_prompt", "price_per_1k_completion")
+    }
     assert cfg.config_hash == sha256_json(legacy)
     assert BenchmarkConfig(seeds=(0, 1)).config_hash != cfg.config_hash
     with pytest.raises(ValueError):

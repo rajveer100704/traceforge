@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 
 from traceforge.contracts.common import FrozenModel, JSONValue, StrictModel, sha256_json
 from traceforge.contracts.rewards import RewardBreakdown
@@ -31,6 +31,31 @@ class ProviderConfig(FrozenModel):
     timeout_seconds: float = Field(default=60.0, gt=0)
     seed: int | None = 0
     prompt_template_version: str = "agent-v1"
+    # USD per 1K tokens. None = pricing unknown (cost is reported as unknown, never as $0);
+    # 0.0 = explicitly free (e.g. a self-hosted endpoint). Set both or neither.
+    price_per_1k_prompt: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    price_per_1k_completion: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @field_validator("price_per_1k_prompt", "price_per_1k_completion", mode="before")
+    @classmethod
+    def _no_bool_prices(cls, value: object) -> object:
+        # bool is an int subclass and would otherwise coerce to 1.0 / 0.0; ints and floats stay.
+        if isinstance(value, bool):
+            raise ValueError("prices must be numbers (USD per 1K tokens), not booleans")
+        return value
+
+    @model_validator(mode="after")
+    def _pricing_complete(self) -> ProviderConfig:
+        if (self.price_per_1k_prompt is None) != (self.price_per_1k_completion is None):
+            raise ValueError(
+                "set both price_per_1k_prompt and price_per_1k_completion (use 0.0 for free), "
+                "or neither (pricing unknown)"
+            )
+        return self
+
+    @property
+    def pricing_known(self) -> bool:
+        return self.price_per_1k_prompt is not None and self.price_per_1k_completion is not None
 
 
 class RolloutRequest(FrozenModel):
@@ -86,6 +111,11 @@ BENCHMARK_V02_DEFAULTS: dict[str, object] = {
     "training_lineage": TrainingLineage().model_dump(mode="json"),
     "reward_thresholds": [0.1, 0.25, 0.5, 0.75, 0.9],
 }
+# Provider fields added in v0.3; hashed only when set, so earlier benchmark hashes are stable.
+PROVIDER_V03_DEFAULTS: dict[str, object] = {
+    "price_per_1k_prompt": None,
+    "price_per_1k_completion": None,
+}
 
 
 class BenchmarkConfig(FrozenModel):
@@ -125,6 +155,10 @@ class BenchmarkConfig(FrozenModel):
         for key, default in BENCHMARK_V02_DEFAULTS.items():
             if data.get(key) == default:
                 data.pop(key, None)
+        provider = data["provider"]
+        for key, default in PROVIDER_V03_DEFAULTS.items():
+            if provider.get(key) == default:
+                provider.pop(key, None)
         return sha256_json(data)
 
 

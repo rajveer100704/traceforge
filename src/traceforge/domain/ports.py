@@ -162,13 +162,30 @@ class GeneratedToolCall:
 
 @dataclass(frozen=True)
 class Generation:
+    """One model response plus the telemetry needed to account for it.
+
+    Missing measurements are explicit: token counts are meaningful only when ``usage_reported``;
+    ``cost_usd`` is None when the cost cannot be determined (0.0 means explicitly free);
+    ``finish_reason`` is None when the provider did not report one.
+    """
+
     content: str
     tool_calls: tuple[GeneratedToolCall, ...]
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    cost_usd: float = 0.0
-    finish_reason: str = "stop"
+    cost_usd: float | None = None
+    finish_reason: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    # None = infer (providers written before v0.3): usage counts as reported when a token count
+    # was supplied (> 0). New providers set it explicitly; zero counts alone are not "reported".
+    usage_reported: bool | None = None
+    request_seconds: float | None = None  # wall time of the call, including retries
+    attempts: int | None = None  # HTTP attempts made (1 = no retry)
+
+    def __post_init__(self) -> None:
+        if self.usage_reported is None:
+            inferred = self.prompt_tokens > 0 or self.completion_tokens > 0
+            object.__setattr__(self, "usage_reported", inferred)
 
 
 class ModelProvider(Protocol):
@@ -176,6 +193,12 @@ class ModelProvider(Protocol):
     model_id: str
     model_revision: str
     trusted: bool  # True only for deterministic, audited demo policies
+
+    @property
+    def pricing_known(self) -> bool:
+        """True when the cost of every call can be determined (0.0 = explicitly free counts as
+        known). A task with a cost budget refuses providers without known pricing (fail closed)."""
+        ...
 
     async def generate(
         self,

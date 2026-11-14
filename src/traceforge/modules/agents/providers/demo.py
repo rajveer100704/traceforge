@@ -336,6 +336,9 @@ class ScriptedDemoProvider:
     kind = "demo"
     trusted = True
     model_revision = "scripted-1"
+    # Scripted policies make no model call: cost is explicitly zero (not unknown), and there is
+    # no token usage to report (usage_reported stays False, so token metrics read "not reported").
+    pricing_known = True
 
     def __init__(self, policy: str = "reference") -> None:
         table = all_policies()
@@ -362,7 +365,7 @@ class ScriptedDemoProvider:
         except StopIteration:
             action = None
         if action is None:
-            return Generation(content="Done.", tool_calls=(), finish_reason="stop")
+            return Generation(content="Done.", tool_calls=(), finish_reason="stop", cost_usd=0.0)
         self._calls += 1
         name, args = action
         return Generation(
@@ -371,6 +374,7 @@ class ScriptedDemoProvider:
                 GeneratedToolCall(call_id=f"demo-{self._calls}", name=name, arguments=args),
             ),
             finish_reason="tool_calls",
+            cost_usd=0.0,
             raw={"policy": self.policy_name},
         )
 
