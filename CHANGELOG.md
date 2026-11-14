@@ -2,7 +2,28 @@
 
 ## Unreleased
 
-## Unreleased
+### Changed (v0.3 PR 1A: provider pricing and telemetry integrity)
+- `ProviderConfig` gains `price_per_1k_prompt` / `price_per_1k_completion` (USD per 1K tokens).
+  `None` = pricing unknown, `0.0` = explicitly free; set both or neither. The factory now passes
+  them to the OpenAI-compatible provider. Before this, configured prices could not reach the
+  provider, so every call was costed at $0. Unset fields are excluded from `config_hash`, so
+  existing benchmark hashes are unchanged (pinned by golden tests).
+- Generations record whether usage was reported, cost (`None` when unknown, never folded into
+  $0), finish reason (`None` when not reported), request seconds and HTTP attempts. Token usage
+  is attached to a trajectory step only when the provider reported it.
+- Failed calls raise `ProviderCallFailed` (a `ProviderError`), classified as `timeout`,
+  `rate_limited`, `server_error`, `http_error`, `transport_error` or `malformed_response`, with
+  attempts, last status and seconds. The runner records the kind, and whether its own deadline
+  expired, on the failing step. Termination reasons are unchanged (`provider_timeout`,
+  `provider_error`).
+- Rollout metadata adds per-episode generation telemetry: request count, usage and cost
+  coverage, episode cost (`None` if any request's cost is unknown), per-request seconds, attempts
+  and retries, finish-reason counts and provider failure. Aggregation and reporting follow in
+  PR 1B.
+- Cost budgets fail closed. An episode with `max_cost_usd > 0` is refused when the provider has
+  no known pricing, and ends with `budget:max_cost_unverifiable` if any call's cost is unknown.
+- The scripted demo provider is explicitly free (`cost_usd=0.0`) and still reports no token
+  usage. Its results remain infrastructure validation, not learned-model evidence.
 
 ### Added
 - `research/HISTORICAL_SHA256SUMS`: SHA-256 of every protected historical artifact (v0.2.0
