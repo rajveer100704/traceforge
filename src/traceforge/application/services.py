@@ -42,7 +42,7 @@ from traceforge.modules.evaluation.runner import (
     BenchmarkResult,
     BenchmarkRunner,
 )
-from traceforge.modules.evaluation.serialization import dumps_finite
+from traceforge.modules.evaluation.serialization import dumps_finite, finite_document
 from traceforge.modules.rewards.engine import RewardEngine
 from traceforge.modules.rewards.policies import PolicyRegistry
 from traceforge.modules.tasks.registry import TaskRegistry
@@ -512,7 +512,9 @@ class EvaluationService:
             benchmark_id=eval_id,
             leakage=leakage,
         )
-        doc = benchmark_document(result, {"evaluation_run_id": str(eval_id)})
+        # One finite copy feeds every view: JSON, Markdown and the database row show the same
+        # values (a non-finite number is null / "n/a" everywhere) and list the replaced paths.
+        doc = finite_document(benchmark_document(result, {"evaluation_run_id": str(eval_id)}))
         md = benchmark_markdown(doc)
         json_bytes = dumps_finite(doc, indent=2).encode()
         report_id, report_uri = self.artifacts.put(
@@ -527,8 +529,7 @@ class EvaluationService:
         (out_dir / "report.md").write_text(md, encoding="utf-8")
         status = "cancelled" if result.cancelled else "completed"
         with self.db.session() as s:
-            ExperimentRepository(s).finish_evaluation(
-                eval_id,
+            db_metrics = finite_document(
                 {
                     **{
                         k: v
@@ -537,7 +538,11 @@ class EvaluationService:
                     },
                     "leakage": result.leakage.as_dict(),
                     "run_mode": config.run_mode,
-                },
+                }
+            )
+            ExperimentRepository(s).finish_evaluation(
+                eval_id,
+                db_metrics,
                 report_id,
                 status,
             )

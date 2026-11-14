@@ -12,10 +12,14 @@ import pytest
 
 from tests.unit.metric_fakes import ep
 from traceforge.contracts.experiments import BenchmarkConfig, ProviderConfig
-from traceforge.contracts.verification import Verdict
+from traceforge.contracts.verification import CheckStatus, Verdict
 from traceforge.modules.evaluation.reports import benchmark_markdown
 from traceforge.modules.evaluation.runner import BenchmarkRunner
-from traceforge.modules.evaluation.serialization import dumps_finite, finite_json
+from traceforge.modules.evaluation.serialization import (
+    dumps_finite,
+    finite_document,
+    finite_json,
+)
 from traceforge.modules.evaluation.statistics import format_rate
 
 # ------------------------------------------------------------------------ finite JSON
@@ -112,7 +116,7 @@ def test_markdown_renders_empty_denominators_as_na_not_zero() -> None:
     runs = [ep(checks={"hidden_security": None, "regression": None})]
     md = benchmark_markdown(_doc(runs))  # type: ignore[arg-type]
     assert "| Hidden security pass rate | n/a (n=0) |" in md
-    assert "| Regression failure rate (executed) | n/a (n=0) |" in md
+    assert "| Regression failure rate (usable results) | n/a (n=0) |" in md
 
 
 def test_markdown_states_units_denominators_coverage_and_methods() -> None:
@@ -190,3 +194,69 @@ def test_experiment_g_partial_pricing_is_rejected(pricing: dict[str, Any]) -> No
 
     with pytest.raises(ValueError, match="set both"):
         _apply_pricing({"kind": "openai_compatible"}, pricing)
+
+
+def test_experiment_g_arm_prices_both_neither_or_rejected() -> None:
+    from traceforge.application.experiments import _apply_pricing
+
+    shared = {"prompt_per_1k": 0.5, "completion_per_1k": 1.5}
+    model = {"kind": "openai_compatible", "base_url": "http://x/v1", "model_id": "m"}
+    both = {**model, "price_per_1k_prompt": 2.0, "price_per_1k_completion": 3.0}
+    assert _apply_pricing(both, shared) == both  # the arm's own pair wins
+    neither = _apply_pricing(model, shared)  # the shared pair applies
+    assert (neither["price_per_1k_prompt"], neither["price_per_1k_completion"]) == (0.5, 1.5)
+    for one_sided in (
+        {**model, "price_per_1k_completion": 9.0},
+        {**model, "price_per_1k_prompt": 9.0},
+        {**model, "price_per_1k_prompt": 9.0, "price_per_1k_completion": None},
+    ):
+        for block in (shared, {}):
+            with pytest.raises(ValueError, match="arm provider: set both"):
+                _apply_pricing(one_sided, block)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_markdown_and_json_render_the_same_finite_document(bad: float) -> None:
+    import re
+
+    doc = _doc([ep(reward=bad), ep("t2", reward=0.5)])
+    doc["metrics"]["overall"]["mean_duration_seconds"] = bad
+    clean = finite_document(doc)
+    assert "metrics.per_task[0].reward" in clean["non_finite_fields"]
+    assert "metrics.overall.mean_duration_seconds" in clean["non_finite_fields"]
+    assert clean["metrics"]["per_task"][0]["reward"] is None
+    md = benchmark_markdown(clean)
+    assert not re.search(r"(nan|-?inf|infinity)", md, re.IGNORECASE)
+    assert json.loads(dumps_finite(clean)) == clean  # JSON view equals the Markdown's source
+
+
+def test_finite_document_leaves_finite_documents_unchanged() -> None:
+    doc = _doc([ep()])
+    clean = finite_document(doc)
+    assert "non_finite_fields" not in clean
+    assert benchmark_markdown(clean) == benchmark_markdown(json.loads(json.dumps(doc, default=str)))
+
+
+def test_cli_output_is_strict_json(capsys: pytest.CaptureFixture[str]) -> None:
+    from traceforge.cli import _out
+
+    _out({"rate": float("nan"), "n": 2, "id": uuid.UUID(int=3)})
+    text = capsys.readouterr().out
+    assert "NaN" not in text
+    assert json.loads(text) == {
+        "rate": None,
+        "n": 2,
+        "id": str(uuid.UUID(int=3)),
+        "non_finite_fields": ["rate"],
+    }
+
+
+def test_markdown_cost_section_explains_status_and_lower_bound() -> None:
+    md = benchmark_markdown(_doc([ep(cost=0.01), ep("t2", cost=None)]))
+    assert "Cost status: **partial**" in md
+    assert "including every provider-failure episode" in md
+    assert "the true total is at least this much" in md
+    md = benchmark_markdown(_doc([ep(cost=1e308), ep("t2", cost=1e308)]))
+    assert "Cost status: **overflow**" in md and "Lower bound" not in md
+    md = benchmark_markdown(_doc([ep(checks={"regression": CheckStatus.ERROR})]))
+    assert "error 1" in md and "never counted as passes" in md

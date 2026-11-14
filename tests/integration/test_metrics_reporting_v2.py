@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ import pytest
 
 from traceforge.contracts.experiments import BenchmarkConfig, ProviderConfig
 from traceforge.contracts.tasks import Split
-from traceforge.modules.evaluation.metric_contract import METRICS, emitted_keys
+from traceforge.modules.evaluation.metric_contract import audit_summary, record_problems
 
 
 def _strict_json(path: str) -> dict[str, Any]:
@@ -35,10 +36,21 @@ def test_demo_benchmark_report_is_schema_2_finite_and_complete(platform: Any) ->
     m = doc["metrics"]
     o = m["overall"]
     assert doc["metrics_schema_version"] == "2" and doc["report_tier"] == "development"
-    assert emitted_keys(o) <= set(METRICS)
+    assert audit_summary(o)[0] == []
+    assert record_problems("benchmark_document", doc) == []
+    assert record_problems("benchmark_aggregate", m) == []
+    assert record_problems("report_block", m["report"]) == []
+    assert all(record_problems("per_episode_row", r) == [] for r in m["per_task"])
+    assert all(record_problems("task_level_row", r) == [] for r in m["task_level"])
+    assert all(
+        record_problems("threshold_sensitivity_row", r) == []
+        for r in m["reward_threshold_sensitivity"]
+    )
+    assert "non_finite_fields" not in doc
     n = o["n_episodes"]
     # Scripted demo provider: explicitly free (cost 0.0, not unknown), no token usage reported.
     assert o["cost"]["total_usd"] == 0.0 and o["cost"]["lower_bound_usd"] is None
+    assert o["cost"]["status"] == "complete"
     assert o["telemetry_coverage"]["cost"]["covered"] == n
     assert o["telemetry_coverage"]["usage"]["covered"] == 0 and o["tokens"]["total"] is None
     assert o["telemetry_coverage"]["generation_telemetry"]["covered"] == n
@@ -100,3 +112,65 @@ def test_experiment_g_partial_pricing_fails_before_any_arm_runs(
     )
     with pytest.raises(ValueError, match="set both"):
         run_experiment(platform, "G", tmp_path / "out", config_path=cfg)
+
+
+def test_experiment_g_one_sided_arm_price_fails_before_any_arm_runs(
+    platform: Any, tmp_path: Path
+) -> None:
+    from traceforge.application.experiments import run_experiment
+
+    cfg = tmp_path / "g.yaml"
+    cfg.write_text(
+        "benchmark: {splits: [public_test], seeds: [0]}\n"
+        "pricing: {prompt_per_1k: 0.5, completion_per_1k: 1.5}\n"
+        "arms:\n"
+        "  pipeline_check: {provider: {kind: demo, policy: reference}}\n"
+        "  half_priced: {provider: {kind: openai_compatible, base_url: 'http://127.0.0.1:9/v1',"
+        " model_id: m, price_per_1k_completion: 9.0}}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="arm provider: set both"):
+        run_experiment(platform, "G", tmp_path / "out", config_path=cfg)
+    assert not (tmp_path / "out").exists() or not any((tmp_path / "out").rglob("*.json"))
+
+
+def test_non_finite_metrics_are_null_in_json_markdown_and_database(
+    platform: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traceforge.modules.evaluation.runner import BenchmarkRunner
+
+    real = BenchmarkRunner.aggregate
+
+    def poisoned(runs: Any, config: Any) -> dict[str, Any]:
+        m = real(runs, config)
+        m["overall"]["mean_reward"] = float("nan")
+        m["overall"]["mean_duration_seconds"] = float("inf")
+        m["per_task"][0]["reward"] = float("-inf")
+        return m
+
+    monkeypatch.setattr(BenchmarkRunner, "aggregate", staticmethod(poisoned))
+    cfg = BenchmarkConfig(
+        name="nan",
+        splits=(Split.PUBLIC_TEST,),
+        max_tasks_per_family=1,
+        provider=ProviderConfig(policy="reference"),
+        bootstrap_samples=100,
+        seeds=(0,),
+    )
+    result, paths = asyncio.run(platform.evaluations.run(cfg))
+    doc = _strict_json(paths["report_json"])
+    assert doc["non_finite_fields"] == [
+        "metrics.overall.mean_duration_seconds",
+        "metrics.overall.mean_reward",
+        "metrics.per_task[0].reward",
+    ]
+    assert doc["metrics"]["overall"]["mean_reward"] is None
+    md = Path(paths["report_md"]).read_text(encoding="utf-8")
+    assert not re.search(r"(nan|-?inf|infinity)", md, re.IGNORECASE)
+    assert "| n/a |" in md  # the poisoned per-episode reward renders as n/a
+    stored = platform.evaluations.get(result.benchmark_id)["metrics"]
+    assert stored["overall"]["mean_reward"] is None
+    assert stored["non_finite_fields"] == [
+        "overall.mean_duration_seconds",
+        "overall.mean_reward",
+    ]

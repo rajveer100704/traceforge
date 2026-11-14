@@ -304,3 +304,71 @@ def test_per_episode_and_task_rows_carry_new_fields() -> None:
     assert rows[1]["provider_failure"] == "other" and rows[1]["seed"] == 1
     assert rows[0]["cost_usd"] == 0.01 and rows[0]["tokens"] == 120
     assert task_level_rows(runs)[0]["provider_failures"] == 1  # type: ignore[arg-type]
+
+
+# ------------------------------------------------------- review follow-up: M2, L2, legacy mix
+
+
+@pytest.mark.parametrize(
+    ("status", "outcome", "executed_n", "unusable"),
+    [
+        (CheckStatus.PASS, "pass", 1, 0),
+        (CheckStatus.FAIL, "fail", 1, 0),
+        (CheckStatus.ERROR, "error", 0, 1),
+        (CheckStatus.INCONCLUSIVE, "inconclusive", 0, 1),
+        (CheckStatus.SKIPPED, "skipped", 0, 0),
+        (None, "missing", 0, 0),
+    ],
+)
+def test_each_regression_outcome_is_counted_once(
+    status: CheckStatus | None, outcome: str, executed_n: int, unusable: int
+) -> None:
+    o = s([ep(checks={"regression": status})])  # type: ignore[dict-item]
+    counts = o["regression_check_outcomes"]
+    assert counts[outcome] == 1 and sum(counts.values()) == 1
+    assert o["regression_failure_rate"]["n"] == 1  # all-episode denominator (v0.2)
+    assert o["regression_failure_rate_executed"]["n"] == executed_n
+    assert o["telemetry_coverage"]["regression_check_unusable"]["covered"] == unusable
+    assert o["regression_failure_rate"]["successes"] == (outcome == "fail")
+
+
+def test_overflowing_cost_sum_is_flagged_not_mislabelled() -> None:
+    o = s([ep(cost=1e308), ep("t2", cost=1e308)])
+    c = o["cost"]
+    assert c["status"] == "overflow"
+    assert c["total_usd"] is None and c["lower_bound_usd"] is None
+    assert c["per_attempt_usd"] is None and c["per_verified_success_usd"] is None
+    assert o["cost_per_verified_success_usd"] is None
+    assert c["episodes_with_known_cost"] == 2  # coverage is kept: it is complete
+    assert o["telemetry_coverage"]["cost"]["covered"] == 2
+
+
+@pytest.mark.parametrize(
+    ("runs", "status"),
+    [
+        ([], "no_episodes"),
+        ([ep(cost=0.01)], "complete"),
+        ([ep(cost=0.01), ep("t2", cost=None)], "partial"),
+        ([ep(cost=None)], "unknown"),
+        ([ep(cost=1e308), ep("t2", cost=1e308), ep("t3", cost=None)], "overflow"),
+    ],
+)
+def test_cost_status(runs: list[Any], status: str) -> None:
+    assert s(runs)["cost"]["status"] == status
+
+
+def test_mixed_legacy_and_new_records_keep_keys_but_totals_are_null() -> None:
+    o = s([ep(cost=0.01), ep("t2", legacy=True)])
+    assert o["cost"]["status"] == "partial" and o["cost"]["total_usd"] is None
+    assert o["cost"]["lower_bound_usd"] == pytest.approx(0.01)
+    assert o["tokens"]["total"] is None and o["token_usage"] is None
+    assert o["telemetry_coverage"]["generation_telemetry"]["covered"] == 1
+    assert o["verified_success"]["successes"] == 2  # outcome metrics are unaffected
+
+
+def test_provider_failure_episode_makes_cost_total_unavailable() -> None:
+    o = s(
+        [ep(cost=0.01), ep("t2", termination="provider_error", provider_failure="other", cost=None)]
+    )
+    assert o["cost"]["total_usd"] is None and o["cost"]["status"] == "partial"
+    assert o["cost"]["lower_bound_usd"] == pytest.approx(0.01)

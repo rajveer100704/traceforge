@@ -34,8 +34,11 @@ missing-data rule, is defined in the versioned metric contract **`docs/metrics-c
 
 - **Outcomes:** verified success, partial success, verifier error rate, reward-positive rate,
   false-positive reward rate, hidden-security pass rate (executed checks only) and regression
-  failure rate (all episodes and executed checks), plus mean reward with a seeded bootstrap CI.
-  End-to-end verified success keeps the scheduled-episode denominator.
+  failure rate (over all episodes, as in v0.2, and over usable PASS/FAIL results; ERROR and
+  INCONCLUSIVE checks are counted separately and never treated as passes), plus mean reward
+  with a seeded bootstrap CI. End-to-end verified success keeps the scheduled-episode
+  denominator. Verdict counts use the run's verifier profile: the default `v3_full` is
+  authoritative, and research profiles are counted the same way.
 - **Provider failures** (timeouts, rate limits, HTTP and transport errors, malformed
   responses) are reported separately from verifier errors, with verifier outcomes among
   episodes without a provider failure.
@@ -43,8 +46,14 @@ missing-data rule, is defined in the versioned metric contract **`docs/metrics-c
   reward-verifier disagreement (`false_positive_reward_label_source: verifier_derived`).
 - **Efficiency:** tokens, cost and tool calls per attempt and per verified success; latency
   p50/p90/p95/max for requests and episodes; telemetry coverage for every measurement.
-- **Missing data:** unknown cost or usage makes totals null, never zero. When cost coverage is
-  partial, `cost.lower_bound_usd` is published as an explicitly labelled lower bound.
+- **Missing data:** totals need every episode. Any episode with unknown cost or usage,
+  including every provider-failure episode, makes the total null, never zero. When cost
+  coverage is partial, `cost.lower_bound_usd` sums the known costs: the true total is at least
+  this much. `cost.status` says why a total is missing (`partial`, `unknown`, or `overflow`
+  when finite costs sum beyond the float range).
+- **Compatibility:** every v0.2 output key is still emitted, but old stored records aggregate
+  differently: empty denominators are null, and records written before v0.3 telemetry have no
+  usage or cost coverage, so token and cost totals over them are null.
 - **Breakdowns:** by split, family, difficulty and seed, plus task-level and per-episode rows.
 
 Proportions use **Wilson score intervals** (95 % default) with explicit `n`; an empty denominator

@@ -598,9 +598,11 @@ def _training_cost(p: Platform, run_ids: list[str]) -> dict[str, Any]:
 def _apply_pricing(provider: dict[str, Any], pricing: dict[str, Any]) -> dict[str, Any]:
     """Apply Experiment G's shared ``pricing`` block to a model arm's provider config.
 
-    Both prices or neither (``null`` = unknown, so cost is reported as unknown, never $0); a
-    price set explicitly on the arm's provider takes precedence. The scripted demo provider is
-    left unchanged (it makes no model call and is explicitly free).
+    Prices come in pairs, both or neither (``null`` = unknown, so cost is reported as unknown,
+    never $0), in the shared block and on each arm. An arm that sets both of its own prices
+    keeps them; an arm that sets neither gets the shared block; an arm that sets only one is
+    rejected (a half-priced arm would silently mix its own and the shared price). The scripted
+    demo provider is left unchanged (it makes no model call and is explicitly free).
     """
     prompt, completion = pricing.get("prompt_per_1k"), pricing.get("completion_per_1k")
     if (prompt is None) != (completion is None):
@@ -608,9 +610,14 @@ def _apply_pricing(provider: dict[str, Any], pricing: dict[str, Any]) -> dict[st
             "Experiment G pricing: set both prompt_per_1k and completion_per_1k (0.0 = free), "
             "or neither (pricing unknown)"
         )
-    if prompt is None or provider.get("kind", "demo") == "demo":
-        return provider
-    if provider.get("price_per_1k_prompt") is not None:
+    arm_prompt = provider.get("price_per_1k_prompt")
+    arm_completion = provider.get("price_per_1k_completion")
+    if (arm_prompt is None) != (arm_completion is None):
+        raise ValueError(
+            "Experiment G arm provider: set both price_per_1k_prompt and "
+            "price_per_1k_completion, or neither (to use the shared pricing block)"
+        )
+    if prompt is None or provider.get("kind", "demo") == "demo" or arm_prompt is not None:
         return provider
     return {**provider, "price_per_1k_prompt": prompt, "price_per_1k_completion": completion}
 
@@ -628,6 +635,9 @@ def _experiment_g(
     arms_cfg: dict[str, Any] = dict(
         cfg.get("arms") or {"pipeline_check": {"provider": {"kind": "demo", "policy": "reference"}}}
     )
+    for spec in arms_cfg.values():  # validate every arm's pricing before any arm runs
+        if (spec or {}).get("provider"):
+            _apply_pricing(dict(spec["provider"]), pricing)
     seeds = tuple(bench.get("seeds") or DEFAULT_SEEDS)
     arms: dict[str, Any] = {}
     for arm, spec in arms_cfg.items():

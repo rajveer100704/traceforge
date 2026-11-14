@@ -42,6 +42,31 @@
   denominator, the mean bootstrap, the pooled-ratio task-cluster bootstrap and benchmark config
   hashes. No historical v0.2.0 output was regenerated.
 
+- Review follow-ups (PR #7):
+  - The metric contract documents every emitted field at every depth: typed value objects
+    (proportion, cluster interval, percentiles, coverage), nested blocks, dynamic keys, and
+    record schemas for per-episode, task-level and threshold rows, the benchmark aggregate and
+    report block, Experiment G arm metrics and the benchmark document. Tests fail on any
+    undocumented or never-emitted field.
+  - Corrected contract text: verdict metrics count the PASS/PARTIAL verdict of the run's
+    verifier profile (authoritative under the default `v3_full`; research profiles are counted
+    the same way). Verifier-derived ground truth needs an authoritative PASS. The task-clustered
+    hidden-security rate is over executed checks.
+  - `regression_failure_rate_executed` now uses only usable results (PASS or FAIL); ERROR and
+    INCONCLUSIVE checks are excluded and reported in `regression_check_outcomes` and
+    `telemetry_coverage.regression_check_unusable`. Before this follow-up they counted as
+    executed non-failures. `regression_failure_rate` (all episodes, v0.2) is unchanged.
+  - `cost.status` (`complete`, `partial`, `unknown`, `overflow`, `no_episodes`). Finite costs
+    whose sum overflows give no total and no lower bound, with coverage kept.
+  - Benchmark reports render JSON, Markdown and the stored database metrics from one finite
+    document, so a non-finite value is `null`/`n/a` in every view; the CLI and demo summary
+    write strict JSON.
+  - Experiment G rejects an arm that sets only one of its two prices, before any arm runs.
+- Compatibility: every v0.2 output key is still emitted, but aggregation of old stored
+  records changes. Empty denominators are `null`, and records written before PR 1A telemetry
+  have no usage or cost coverage, so token and cost totals over them (alone or mixed with new
+  records) are `null`.
+
 ### Changed (v0.3 PR 1A: provider pricing and telemetry integrity)
 - `ProviderConfig` gains `price_per_1k_prompt` / `price_per_1k_completion` (USD per 1K tokens).
   `None` = pricing unknown, `0.0` = explicitly free; set both or neither. The factory now passes

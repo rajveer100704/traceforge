@@ -23,38 +23,46 @@ SMALL_SAMPLE = 10
 ALL = "all scheduled episodes"
 
 
+def _num(x: Any, spec: str) -> str:
+    """Format a number; null (an empty denominator, or a non-finite value written as null by
+    finite_document) renders as 'n/a', never 'nan' or a crash."""
+    if x is None or isinstance(x, bool) or not isinstance(x, int | float):
+        return "n/a"
+    return format(x, spec)
+
+
 def _pct(p: dict[str, Any] | None) -> str:
     """Wilson proportion; an empty denominator is 'n/a (n=0)', never 0%."""
     if not p:
         return "n/a"
     if p.get("rate") is None:
         return f"n/a (n={p.get('n', 0)})"
-    return f"{p['rate']:.1%} [{p['ci_low']:.1%}, {p['ci_high']:.1%}] (n={p['n']})"
+    return f"{_num(p['rate'], '.1%')} [{_num(p.get('ci_low'), '.1%')}, {_num(p.get('ci_high'), '.1%')}] (n={p['n']})"
 
 
 def _fmt(x: Any, digits: int = 3) -> str:
     if x is None:
         return "n/a"
     if isinstance(x, float):
-        return f"{x:.{digits}f}"
+        return _num(x, f".{digits}f")
     return str(x)
 
 
 def _usd(x: Any) -> str:
-    return "not reported" if x is None else f"${x:.6f}"
+    return "not reported" if x is None else f"${_num(x, '.6f')}"
 
 
 def _cov(c: dict[str, Any] | None) -> str:
     if not c:
         return "n/a"
     frac = c.get("fraction")
-    return f"{c['covered']}/{c['n']}" + ("" if frac is None else f" ({frac:.0%})")
+    return f"{c['covered']}/{c['n']}" + ("" if frac is None else f" ({_num(frac, '.0%')})")
 
 
 def _ci(c: dict[str, Any]) -> str:
     if c.get("ci_low") is None:
         return "undefined (< 2 tasks)"
-    return f"[{c['ci_low']:.3f}, {c['ci_high']:.3f}]"
+    return f"[{_num(c['ci_low'], '.3f')}, {_num(c.get('ci_high'), '.3f')}]"
 
 
 def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
@@ -157,7 +165,7 @@ def _methodology(doc: dict[str, Any], m: dict[str, Any], o: dict[str, Any]) -> l
         "candidate in a separate environment, plus state, safety and evidence checks. Reward is "
         "computed only from the verification result.",
         "",
-        f"- Proportions: Wilson score intervals at {cfg['confidence']:.0%} confidence, "
+        f"- Proportions: Wilson score intervals at {_num(cfg['confidence'], '.0%')} confidence, "
         "episode-level and descriptive (episodes of one task are not independent).",
         f"- Task-clustered intervals: {stats.get('task_cluster_interval', 'n/a')}; estimand: "
         f"{stats.get('task_cluster_estimand', 'n/a')}. These are the intervals for claims "
@@ -200,9 +208,15 @@ def _overall(o: dict[str, Any]) -> list[str]:
         ),
         ("Regression failure rate", _pct(o["regression_failure_rate"]), f"FAIL / {ALL}"),
         (
-            "Regression failure rate (executed)",
+            "Regression failure rate (usable results)",
             _pct(o.get("regression_failure_rate_executed")),
-            "FAIL / episodes where the check executed",
+            "FAIL / episodes with a PASS or FAIL regression result",
+        ),
+        (
+            "Regression check outcomes",
+            ", ".join(f"{k} {v}" for k, v in (o.get("regression_check_outcomes") or {}).items())
+            or "n/a",
+            "ERROR/INCONCLUSIVE ran without a usable result (excluded, never counted as passes)",
         ),
         (
             "Mean reward",
@@ -310,11 +324,24 @@ def _cost_section(o: dict[str, Any]) -> list[str]:
             "episodes whose every request reported usage / all episodes",
         ),
     ]
+    status = cost.get("status")
+    notes = {
+        "partial": "Cost coverage is partial, so no total is reported. The lower bound sums only "
+        "the known costs; the true total is at least this much.",
+        "unknown": "No episode has a known cost, so no total or lower bound is reported.",
+        "overflow": "Every known cost is finite but their sum is not representable as a float, "
+        "so no total or lower bound is reported.",
+    }
     return [
         "## Cost and tokens",
         "",
+        "Totals need every episode. Any episode with unknown cost or usage, including every "
+        "provider-failure episode (a failed call may still have been billed), makes the total "
+        f"unavailable. Cost status: **{status or 'n/a'}**.",
+        "",
         *_table(("Metric", "Value", "Numerator / denominator"), rows),
         "",
+        *([notes[status], ""] if status in notes else []),
     ]
 
 
@@ -427,8 +454,8 @@ def _breakdowns(m: dict[str, Any]) -> list[str]:
                 str(t["family"]),
                 str(t["split"]),
                 str(t["n_episodes"]),
-                f"{t['verified_success_rate']:.0%}",
-                f"{t['mean_reward']:.3f}",
+                _num(t["verified_success_rate"], ".0%"),
+                _num(t["mean_reward"], ".3f"),
                 str(t["outcome_consistent_across_episodes"]),
                 str(t.get("provider_failures", 0)),
             )
@@ -452,7 +479,7 @@ def _breakdowns(m: dict[str, Any]) -> list[str]:
             str(r["family"]),
             str(r["split"]),
             str(r["verdict"]),
-            f"{r['reward']:.3f}",
+            _num(r["reward"], ".3f"),
             str(r["tool_calls"]),
             str(r.get("termination_reason", "—")),
             ", ".join(r["failure_reasons"]) or "—",

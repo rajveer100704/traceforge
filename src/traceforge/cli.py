@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import uuid
@@ -42,7 +41,9 @@ for name, sub in [
 
 
 def _out(data: Any) -> None:
-    typer.echo(json.dumps(data, indent=2, default=str))
+    from traceforge.modules.evaluation.serialization import dumps_finite
+
+    typer.echo(dumps_finite(data, indent=2))  # strict JSON; non-finite values become null
 
 
 def _fail(message: str, code: int = 1) -> None:

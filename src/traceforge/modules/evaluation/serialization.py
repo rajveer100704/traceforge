@@ -35,6 +35,18 @@ def finite_json(obj: Any) -> tuple[Any, list[str]]:
     return walk(_normalise(obj), ""), sorted(paths)
 
 
+def finite_document(doc: dict[str, Any], record_key: str = "non_finite_fields") -> dict[str, Any]:
+    """A finite, plain-JSON copy of a report document, with replaced paths recorded.
+
+    Render every view (JSON, Markdown, database rows) from this copy, so they show the same
+    values: a non-finite number is ``null`` / "n/a" everywhere, never "nan" in one view.
+    """
+    clean, paths = finite_json(doc)
+    if paths:
+        clean[record_key] = paths
+    return clean
+
+
 def dumps_finite(obj: Any, *, record_key: str | None = "non_finite_fields", **kwargs: Any) -> str:
     """Serialise ``obj`` as strict JSON. When ``record_key`` is set and ``obj`` is a dict with
     non-finite values, the replaced paths are recorded under that key."""

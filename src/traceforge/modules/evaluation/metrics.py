@@ -1,8 +1,20 @@
 """Benchmark metrics computed from rollout summaries (real values only).
 
-Every emitted key is defined in ``metric_contract.py`` (schema 2). Missing telemetry is never
+Every emitted field is defined in ``metric_contract.py`` (schema 2). Missing telemetry is never
 treated as zero: it is excluded, counted in ``telemetry_coverage`` and makes dependent totals
-null. v0.2 keys keep their meaning for non-empty inputs; an empty denominator is null.
+null.
+
+Compatibility:
+- Output keys: every v0.2 key is still emitted. For non-empty denominators the v0.2 outcome
+  rates are computed exactly as before; an empty denominator is now null (was 0.0).
+- Aggregation of stored records changed in two intended ways. Records written before v0.3
+  telemetry carry no usage/cost coverage, so token and cost totals over them (or over a mix of
+  old and new records) are null rather than a sum of possibly partial counts; ``n_seeds`` no
+  longer counts a missing seed as a seed value.
+- Coverage: totals need every episode. Any episode with unknown usage or cost, including every
+  provider-failure episode (whose failed call may have been billed and reported no usage), makes
+  the full token/cost total unavailable. ``cost.lower_bound_usd`` then reports the sum of the
+  known costs, a lower bound on spend, and ``cost.status`` says why the total is missing.
 """
 
 from __future__ import annotations
@@ -49,6 +61,15 @@ def _finite(value: Any) -> float | None:
         return None
     f = float(value)
     return f if math.isfinite(f) else None
+
+
+def _finite_sum(values: list[float]) -> float | None:
+    """Exact float sum, or None when the total is not representable (overflow)."""
+    try:
+        total = math.fsum(values)
+    except OverflowError:  # fsum raises on intermediate overflow instead of returning inf
+        return None
+    return total if math.isfinite(total) else None
 
 
 def _ratio(num: float | None, den: float | None) -> float | None:
@@ -132,11 +153,11 @@ def summarize(
     errors = sum(r.verification.verdict in (Verdict.ERROR, Verdict.INCONCLUSIVE) for r in runs)
     rewarded = [r for r in runs if r.reward.final_reward >= reward_threshold]
     false_positive = [r for r in rewarded if not _truly_successful(r, ground_truth)]
-    regression_executed = [
-        r
-        for r in runs
-        if (c := r.verification.check("regression")) is not None and c.status != CheckStatus.SKIPPED
-    ]
+    # Regression check outcomes. Only PASS and FAIL are usable results: ERROR and INCONCLUSIVE
+    # checks ran but did not decide, so they are neither failures nor passes and are counted
+    # separately (regression_check_outcomes, telemetry_coverage.regression_check_unusable).
+    reg_outcomes = Counter(_check_outcome(r, "regression") for r in runs)
+    regression_usable = reg_outcomes["pass"] + reg_outcomes["fail"]
     regression_fail = sum(
         (c := r.verification.check("regression")) is not None and c.status == CheckStatus.FAIL
         for r in runs
@@ -183,15 +204,32 @@ def summarize(
     )
 
     # ---- cost (unknown is never 0; a lower bound only when coverage is partial) ---------
+    # Any episode with an unknown cost (including provider-failure episodes, whose failed call
+    # may still have been billed) makes the full total unavailable; the known costs then form a
+    # lower bound. A sum of finite costs that is not representable is reported as overflow,
+    # never as unknown coverage and never as a partial-coverage lower bound.
     known_costs = [t.cost for t in tel if t.cost is not None]
     cost_complete = n > 0 and len(known_costs) == n
-    total_cost = _finite(sum(known_costs)) if cost_complete else None
-    lower_bound = _finite(sum(known_costs)) if known_costs and not cost_complete else None
+    known_sum = _finite_sum(known_costs) if known_costs else None
+    overflow = bool(known_costs) and known_sum is None
+    if n == 0:
+        cost_status = "no_episodes"
+    elif overflow:
+        cost_status = "overflow"
+    elif cost_complete:
+        cost_status = "complete"
+    elif known_costs:
+        cost_status = "partial"
+    else:
+        cost_status = "unknown"
+    total_cost = known_sum if cost_status == "complete" else None
+    lower_bound = known_sum if cost_status == "partial" else None
     cost = {
         "total_usd": total_cost,
         "per_attempt_usd": _ratio(total_cost, n),
         "per_verified_success_usd": _ratio(total_cost, verified),
         "lower_bound_usd": lower_bound,
+        "status": cost_status,
         "episodes_with_known_cost": len(known_costs),
         "n_episodes": n,
     }
@@ -265,8 +303,9 @@ def summarize(
         "false_positive_reward_label_source": label_source,
         "regression_failure_rate": proportion(regression_fail, n, confidence),
         "regression_failure_rate_executed": proportion(
-            regression_fail, len(regression_executed), confidence
+            regression_fail, regression_usable, confidence
         ),
+        "regression_check_outcomes": {k: reg_outcomes[k] for k in CHECK_OUTCOMES},
         "hidden_security_pass_rate": proportion(sum(hidden_known), len(hidden_known), confidence),
         "mean_reward": _mean(rewards),
         "mean_reward_ci": bootstrap_mean_interval(
@@ -307,7 +346,11 @@ def summarize(
             "request_latency": _coverage(sum(t.request_latency_complete for t in tel), n),
             "attempts": _coverage(sum(t.attempts is not None for t in tel), n),
             "hidden_security_check": _coverage(len(hidden_known), n),
-            "regression_check": _coverage(len(regression_executed), n),
+            # usable (PASS/FAIL) results; ERROR/INCONCLUSIVE ran without a usable result
+            "regression_check": _coverage(regression_usable, n),
+            "regression_check_unusable": _coverage(
+                reg_outcomes["error"] + reg_outcomes["inconclusive"], n
+            ),
         },
         "n_episodes": n,
         "n_tasks": len(tasks),
@@ -380,6 +423,18 @@ def summarize(
             sum(r.reward.final_reward >= reward_threshold for r in truly), len(truly), confidence
         )
     return out
+
+
+CHECK_OUTCOMES = ("pass", "fail", "error", "inconclusive", "skipped", "missing")
+
+
+def _check_outcome(r: RolloutSummary, name: str) -> str:
+    """pass | fail | error | inconclusive | skipped | missing (check absent)."""
+    c = r.verification.check(name)
+    if c is None:
+        return "missing"
+    status = getattr(c.status, "value", str(c.status)).lower()
+    return status if status in CHECK_OUTCOMES else "error"
 
 
 def _check_pass(r: RolloutSummary, name: str) -> bool | None:
