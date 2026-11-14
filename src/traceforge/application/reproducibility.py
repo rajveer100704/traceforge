@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any
 
 from traceforge import __version__
 from traceforge.contracts.common import sha256_json
+from traceforge.modules.evaluation.serialization import dumps_finite
 
 if TYPE_CHECKING:
     from traceforge.application.container import Platform
@@ -190,10 +191,10 @@ def write_bundle(
     bundle = out_dir / "bundle"
     bundle.mkdir(parents=True, exist_ok=True)
     (bundle / "metrics.json").write_text(
-        json.dumps(document, indent=2, default=str, sort_keys=True), encoding="utf-8", newline="\n"
+        dumps_finite(document, indent=2, sort_keys=True), encoding="utf-8", newline="\n"
     )
     if episodes:
-        raw = "".join(json.dumps(e, default=str, sort_keys=True) + "\n" for e in episodes)
+        raw = "".join(dumps_finite(e, sort_keys=True) + "\n" for e in episodes)
         # mtime=0 keeps the archive byte-stable for identical content
         with gzip.GzipFile(bundle / "episodes.jsonl.gz", "wb", mtime=0) as gz:
             gz.write(raw.encode("utf-8"))

@@ -26,7 +26,11 @@ from traceforge.modules.agents.providers.demo import POLICIES, all_policies
 from traceforge.modules.agents.providers.fixers import reference_edits
 from traceforge.modules.environments.task_env import EnvironmentPolicy
 from traceforge.modules.evaluation import attack_catalog
-from traceforge.modules.evaluation.statistics import cluster_bootstrap, proportion
+from traceforge.modules.evaluation.statistics import (
+    cluster_bootstrap,
+    format_rate,
+    proportion,
+)
 from traceforge.modules.rewards.engine import RewardEngine
 from traceforge.modules.rewards.policies import PolicyRegistry
 from traceforge.modules.tasks.registry import TaskRegistry
@@ -274,9 +278,10 @@ def hacking_markdown(doc: dict[str, Any]) -> str:
     for d, v in doc["designs"].items():
         fp, tp = v["false_positive_reward_rate"], v["true_positive_reward_rate"]
         lines.append(
-            f"| {d} | `{v['verifier_profile']}` | {fp['rate']:.1%} [{fp['ci_low']:.1%}, {fp['ci_high']:.1%}] "
+            f"| {d} | `{v['verifier_profile']}` | {format_rate(fp['rate'], '.1%')} "
+            f"[{fp['ci_low']:.1%}, {fp['ci_high']:.1%}] "
             f"(n={fp['n']}) | {_cci(v.get('false_positive_reward_rate_task_clustered'))} | "
-            f"{tp['rate']:.1%} [{tp['ci_low']:.1%}, {tp['ci_high']:.1%}] (n={tp['n']}) | "
+            f"{format_rate(tp['rate'], '.1%')} [{tp['ci_low']:.1%}, {tp['ci_high']:.1%}] (n={tp['n']}) | "
             f"{_cci(v.get('true_positive_reward_rate_task_clustered'))} |"
         )
     if doc.get("reward_threshold_sensitivity"):
@@ -340,8 +345,8 @@ def _sensitivity_md(sens: dict[str, Any]) -> list[str]:
     ]
     for d, rows in sens.items():
         cells = [
-            f"FP {r['false_positive_reward_rate']['rate']:.0%} / "
-            f"TP {r['true_positive_reward_rate']['rate']:.0%}"
+            f"FP {format_rate(r['false_positive_reward_rate']['rate'], '.0%')} / "
+            f"TP {format_rate(r['true_positive_reward_rate']['rate'], '.0%')}"
             for r in rows
         ]
         lines.append(f"| {d} | " + " | ".join(cells) + " |")
@@ -450,9 +455,9 @@ def unseen_attacks_markdown(doc: dict[str, Any]) -> str:
         for d, v in st["designs"].items():
             fp, tp = v["false_positive_reward_rate"], v["true_positive_reward_rate"]
             lines.append(
-                f"| {name} | {d} | {fp['rate']:.1%} [{fp['ci_low']:.1%}, {fp['ci_high']:.1%}] "
+                f"| {name} | {d} | {format_rate(fp['rate'], '.1%')} [{fp['ci_low']:.1%}, {fp['ci_high']:.1%}] "
                 f"(n={fp['n']}) | {_cci(v['false_positive_reward_rate_task_clustered'])} | "
-                f"{tp['rate']:.1%} (n={tp['n']}) |"
+                f"{format_rate(tp['rate'], '.1%')} (n={tp['n']}) |"
             )
     lines += [
         "",

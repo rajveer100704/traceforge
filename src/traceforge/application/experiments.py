@@ -27,6 +27,8 @@ from traceforge.contracts.experiments import (
 )
 from traceforge.contracts.tasks import Split
 from traceforge.modules.evaluation import experiments as ex
+from traceforge.modules.evaluation.serialization import dumps_finite
+from traceforge.modules.evaluation.statistics import format_rate
 from traceforge.modules.training.capabilities import detect
 
 if TYPE_CHECKING:
@@ -53,7 +55,7 @@ SCRIPTED_NOTE = (
 def _write(out_dir: Path, stem: str, doc: dict[str, Any], md: str) -> dict[str, str]:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{stem}.json").write_text(
-        json.dumps(doc, indent=2, default=str), encoding="utf-8", newline="\n"
+        dumps_finite(doc, indent=2), encoding="utf-8", newline="\n"
     )
     (out_dir / f"{stem}.md").write_text(md, encoding="utf-8", newline="\n")
     return {"json": str(out_dir / f"{stem}.json"), "markdown": str(out_dir / f"{stem}.md")}
@@ -237,7 +239,7 @@ def _experiment_d(
         "learned generalisation. Re-run with a model provider for real measurements.",
     }
     rows = "".join(
-        f"| {k} | {v['verified_success']['rate']:.1%} | {v['n_tasks']} | {v['n_episodes']} | "
+        f"| {k} | {format_rate(v['verified_success']['rate'], '.1%')} | {v['n_tasks']} | {v['n_episodes']} | "
         f"{ex._cci(v['task_clustered']['verified_success'])} |\n"
         for k, v in doc["by_split"].items()
     )
@@ -287,7 +289,7 @@ def _experiment_c(
     md = (
         "# Experiment C — base vs SFT vs SFT+GRPO\n\n"
         f"> **{SCRIPTED_NOTE}**\n\n"
-        f"- Baseline (scripted demo provider): {doc['baseline']['verified_success']['rate']:.1%} "
+        f"- Baseline (scripted demo provider): {format_rate(doc['baseline']['verified_success']['rate'], '.1%')} "
         f"({o['n_tasks']} independent tasks, {o['n_episodes']} episodes, seeds {list(seeds)}) — "
         f"report `{paths['report_md']}`\n"
         f"- SFT: **{doc['sft']}**\n- GRPO: **{doc['grpo']}**\n\n"
@@ -551,6 +553,13 @@ def _arm_metrics(m: dict[str, Any]) -> dict[str, Any]:
         "mean_episode_seconds": o["mean_duration_seconds"],
         "mean_generation_seconds": o["mean_generation_seconds"],
         "token_usage": o["token_usage"],
+        "tokens": o["tokens"],
+        "cost": o["cost"],
+        "cost_per_verified_success_usd": o["cost_per_verified_success_usd"],
+        "latency": o["latency"],
+        "provider_failure_rate": o["provider_failures"]["rate"],
+        "false_positive_reward_label_source": o["false_positive_reward_label_source"],
+        "telemetry_coverage": o["telemetry_coverage"],
         "by_family": {k: v["verified_success"] for k, v in m["by_family"].items()},
         "by_difficulty": {k: v["verified_success"] for k, v in m["by_difficulty"].items()},
         "by_seed": {k: v["verified_success"]["rate"] for k, v in m["by_seed"].items()},
@@ -586,6 +595,26 @@ def _training_cost(p: Platform, run_ids: list[str]) -> dict[str, Any]:
     return {"runs": runs, "total_training_seconds": sum(secs) if secs else None}
 
 
+def _apply_pricing(provider: dict[str, Any], pricing: dict[str, Any]) -> dict[str, Any]:
+    """Apply Experiment G's shared ``pricing`` block to a model arm's provider config.
+
+    Both prices or neither (``null`` = unknown, so cost is reported as unknown, never $0); a
+    price set explicitly on the arm's provider takes precedence. The scripted demo provider is
+    left unchanged (it makes no model call and is explicitly free).
+    """
+    prompt, completion = pricing.get("prompt_per_1k"), pricing.get("completion_per_1k")
+    if (prompt is None) != (completion is None):
+        raise ValueError(
+            "Experiment G pricing: set both prompt_per_1k and completion_per_1k (0.0 = free), "
+            "or neither (pricing unknown)"
+        )
+    if prompt is None or provider.get("kind", "demo") == "demo":
+        return provider
+    if provider.get("price_per_1k_prompt") is not None:
+        return provider
+    return {**provider, "price_per_1k_prompt": prompt, "price_per_1k_completion": completion}
+
+
 def _experiment_g(
     p: Platform,
     experiment_id: Any,
@@ -595,6 +624,7 @@ def _experiment_g(
 ) -> tuple[dict[str, Any], str]:
     bench = dict(cfg.get("benchmark") or {})
     pricing = dict(cfg.get("pricing") or {})
+    _apply_pricing({"kind": "demo"}, pricing)  # validate the pricing block before any arm runs
     arms_cfg: dict[str, Any] = dict(
         cfg.get("arms") or {"pipeline_check": {"provider": {"kind": "demo", "policy": "reference"}}}
     )
@@ -615,7 +645,7 @@ def _experiment_g(
             name=f"exp-G-{arm}",
             splits=tuple(Split(s) for s in bench.get("splits", ["public_test", "private_test"])),
             seeds=seeds,
-            provider=ProviderConfig.model_validate(provider),
+            provider=ProviderConfig.model_validate(_apply_pricing(dict(provider), pricing)),
             reward_policy=str(bench.get("reward_policy", "verified-v1")),
             verifier_profile=str(bench.get("verifier_profile", "v3_full")),
             sandbox=str(bench.get("sandbox", "local")),
@@ -627,19 +657,16 @@ def _experiment_g(
             arms[arm] = {"status": "FAILED", "reason": f"{type(exc).__name__}: {str(exc)[:300]}"}
             continue
         metrics = _arm_metrics(result.metrics)
-        tokens = metrics["token_usage"]
-        cost = None
-        if tokens and pricing.get("prompt_per_1k") is not None:
-            cost = tokens["prompt_tokens"] / 1000 * float(pricing["prompt_per_1k"]) + tokens[
-                "completion_tokens"
-            ] / 1000 * float(pricing.get("completion_per_1k") or 0)
+        # Cost comes from the shared metric aggregation (actual per-call provider cost from
+        # usage x prices): null when any episode's cost is unknown, with an explicit lower bound.
         arms[arm] = {
             "status": "EXECUTED",
             "learned_model": bc.provider.kind != "demo",
             "evaluation_id": str(result.benchmark_id),
             "report": paths,
             "metrics": metrics,
-            "inference_cost_usd": cost,
+            "inference_cost_usd": metrics["cost"]["total_usd"],
+            "inference_cost_lower_bound_usd": metrics["cost"]["lower_bound_usd"],
             "training": _training_cost(p, run_ids) if run_ids else None,
         }
     learned = [a for a in arms.values() if a.get("status") == "EXECUTED" and a.get("learned_model")]
@@ -663,7 +690,11 @@ def _experiment_g(
 
 def _g_markdown(doc: dict[str, Any]) -> str:
     def pct(x: dict[str, Any] | None) -> str:
-        return "n/a" if not x else f"{x['rate']:.1%} [{x['ci_low']:.1%}, {x['ci_high']:.1%}]"
+        return (
+            "n/a"
+            if not x
+            else f"{format_rate(x['rate'], '.1%')} [{x['ci_low']:.1%}, {x['ci_high']:.1%}]"
+        )
 
     lines = [
         "# Experiment G — base vs SFT vs SFT+GRPO",
@@ -674,22 +705,33 @@ def _g_markdown(doc: dict[str, Any]) -> str:
         f"`{json.dumps(doc['benchmark'], sort_keys=True)}`.",
         "",
         "| Arm | Status | Tasks / episodes | Verified success | Task-clustered CI | Hidden security pass "
-        "| Regression failure | FP reward rate | Calls / success | Gen. latency (s) | Tokens |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Regression failure | FP reward / disagreement rate | Provider failures | Calls / success "
+        "| Request p50 / p95 (s) | Tokens | Cost (USD) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for name, a in doc["arms"].items():
         if a["status"] != "EXECUTED":
-            lines.append(f"| {name} | {a['status']}: {a['reason']} |" + " |" * 9)
+            lines.append(f"| {name} | {a['status']}: {a['reason']} |" + " |" * 11)
             continue
         m = a["metrics"]
-        tokens = m["token_usage"]["total_tokens"] if m["token_usage"] else "not reported"
+        total_tokens = (m.get("tokens") or {}).get("total")
+        tokens = "not reported" if total_tokens is None else total_tokens
+        cost = m.get("cost") or {}
+        if cost.get("total_usd") is not None:
+            cost_text = f"${cost['total_usd']:.6f}"
+        elif cost.get("lower_bound_usd") is not None:
+            cost_text = f">= ${cost['lower_bound_usd']:.6f} (lower bound)"
+        else:
+            cost_text = "not reported"
+        req = (m.get("latency") or {}).get("request_seconds") or {}
+        latency = f"{req.get('p50')} / {req.get('p95')}" if req.get("n") else "not reported"
         lines.append(
             f"| {name}{'' if a['learned_model'] else ' (scripted)'} | EXECUTED | "
             f"{m['n_tasks']} / {m['n_episodes']} | {pct(m['verified_success'])} | "
             f"{ex._cci(m['verified_success_task_clustered'])} | "
             f"{pct(m['hidden_security_pass_rate'])} | {pct(m['regression_failure_rate'])} | "
-            f"{pct(m['false_positive_reward_rate'])} | {m['tool_calls_per_verified_success']} | "
-            f"{m['mean_generation_seconds']} | {tokens} |"
+            f"{pct(m['false_positive_reward_rate'])} | {pct(m.get('provider_failure_rate'))} | "
+            f"{m['tool_calls_per_verified_success']} | {latency} | {tokens} | {cost_text} |"
         )
     lines += ["", "Per-family/difficulty results and training cost are in the JSON document.", ""]
     return "\n".join(lines)

@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### Added (v0.3 PR 1B: metric contract and reporting)
+- Versioned metric contract (`modules/evaluation/metric_contract.py`, schema 2) with a
+  generated `docs/metrics-contract.md`. Every emitted metric has a registered numerator,
+  denominator, unit, statistical unit, interval method and missing-data rule; tests fail on
+  unregistered keys or doc drift.
+- `summarize` aggregates PR 1A telemetry:
+  - tokens and cost per attempt and per verified success, with `cost_per_verified_success_usd`
+    now implemented;
+  - `cost.lower_bound_usd` when cost coverage is partial;
+  - request, episode and per-episode generation latency (n, p50, p90, p95, max);
+  - telemetry coverage, and finish reasons with a truncation count;
+  - provider failures (by kind and source), separate from verifier errors, plus verifier
+    outcomes among episodes without a provider failure;
+  - regression failure rate over executed checks;
+  - reward precision and recall with independent labels;
+  - `false_positive_reward_label_source`, and a `statistics` block (methods, resamples,
+    seed, pooled-ratio estimand).
+- Opt-in `BenchmarkConfig.report_tier`: `development` (default, excluded from `config_hash`)
+  or `final`, which requires official mode and at least 10,000 bootstrap resamples.
+- Finite JSON (`modules/evaluation/serialization.py`) for benchmark reports, experiment
+  documents and reproducibility bundles: non-finite values are written as `null`, with their
+  paths in `non_finite_fields`.
+
+### Changed (v0.3 PR 1B)
+- `proportion()` returns `rate: null` for an empty denominator (previously 0.0). Rates with a
+  non-empty denominator are unchanged, and report formatters render `n/a (n=0)`.
+- Without complete usage reports, `token_usage` is null, and partial token counts are no
+  longer summed as if complete.
+- `n_seeds` no longer counts a missing seed as a seed value.
+- Markdown reports state units, denominators, coverage, interval methods, the report tier,
+  `n_tasks`, `n_episodes` and labelled-n. They add cost, latency and provider-failure sections
+  and a seed column. Verifier-derived false-positive reward is labelled reward-verifier
+  disagreement.
+- Experiment G applies its `pricing` block (both prices or neither) to model arms and takes
+  cost from the shared aggregation. The old separate calculation treated missing completion
+  pricing as $0.
+- Unchanged, and pinned by golden tests: Wilson intervals, proportions with a non-empty
+  denominator, the mean bootstrap, the pooled-ratio task-cluster bootstrap and benchmark config
+  hashes. No historical v0.2.0 output was regenerated.
+
 ### Changed (v0.3 PR 1A: provider pricing and telemetry integrity)
 - `ProviderConfig` gains `price_per_1k_prompt` / `price_per_1k_completion` (USD per 1K tokens).
   `None` = pricing unknown, `0.0` = explicitly free; set both or neither. The factory now passes

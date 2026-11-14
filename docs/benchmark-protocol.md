@@ -28,14 +28,33 @@ in `reward-design.md`. Each run persists the episode record so verification can 
 
 ## Metrics
 
-Verified success, partial success (improved over the vulnerable baseline but incomplete), verifier
-error rate, reward-positive and false-positive reward rates, regression failure rate, mean reward
-(+ seeded bootstrap CI), tool calls per attempt/success, action rejection rate, task duration,
-environment compute time, token usage/cost when reported by the provider, verifier precision/recall
-when labelled ground truth exists. Breakdowns by split, family and difficulty plus per-task rows.
+Every metric, with its numerator, denominator, unit, statistical unit, interval method and
+missing-data rule, is defined in the versioned metric contract **`docs/metrics-contract.md`**
+(schema 2, generated from `modules/evaluation/metric_contract.py`). In summary:
 
-Proportions use **Wilson score intervals** (95 % default) with explicit `n`. With ≤ 39 tasks, intervals
-are wide; reports state that no significance claims are made.
+- **Outcomes:** verified success, partial success, verifier error rate, reward-positive rate,
+  false-positive reward rate, hidden-security pass rate (executed checks only) and regression
+  failure rate (all episodes and executed checks), plus mean reward with a seeded bootstrap CI.
+  End-to-end verified success keeps the scheduled-episode denominator.
+- **Provider failures** (timeouts, rate limits, HTTP and transport errors, malformed
+  responses) are reported separately from verifier errors, with verifier outcomes among
+  episodes without a provider failure.
+- **Ground truth:** without independent labels, the false-positive reward rate is labelled
+  reward-verifier disagreement (`false_positive_reward_label_source: verifier_derived`).
+- **Efficiency:** tokens, cost and tool calls per attempt and per verified success; latency
+  p50/p90/p95/max for requests and episodes; telemetry coverage for every measurement.
+- **Missing data:** unknown cost or usage makes totals null, never zero. When cost coverage is
+  partial, `cost.lower_bound_usd` is published as an explicitly labelled lower bound.
+- **Breakdowns:** by split, family, difficulty and seed, plus task-level and per-episode rows.
+
+Proportions use **Wilson score intervals** (95 % default) with explicit `n`; an empty denominator
+is `null` (rendered `n/a (n=0)`), never 0 %. With ≤ 39 tasks, intervals are wide; reports state
+that no significance claims are made.
+
+**Report tier** (`report_tier`, v0.3): `development` (default) keeps the configured bootstrap
+resamples (2,000 by default) and labels the report development-grade. `final` requires
+official run mode and at least 10,000 resamples. The default is excluded from `config_hash`,
+so existing hashes are unchanged.
 
 ### Provider pricing and generation telemetry (v0.3)
 
@@ -61,8 +80,8 @@ are wide; reports state that no significance claims are made.
   (`budget:max_cost_unverifiable`) stops the episode before its tool calls run. Unknown cost
   takes precedence over the token limit. A timeout raised by the provider itself is recorded
   as a provider failure, distinct from the runner's own deadline.
-- Benchmark reports do not yet aggregate cost, latency percentiles or telemetry coverage (v0.3
-  PR 1B). Until then, the "token usage/cost" line above means token totals only.
+- Benchmark reports aggregate this telemetry (cost, tokens, latency percentiles, coverage,
+  provider failures) per the metric contract (v0.3 PR 1B).
 
 ## Contamination controls
 

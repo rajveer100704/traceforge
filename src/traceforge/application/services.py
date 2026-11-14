@@ -42,6 +42,7 @@ from traceforge.modules.evaluation.runner import (
     BenchmarkResult,
     BenchmarkRunner,
 )
+from traceforge.modules.evaluation.serialization import dumps_finite
 from traceforge.modules.rewards.engine import RewardEngine
 from traceforge.modules.rewards.policies import PolicyRegistry
 from traceforge.modules.tasks.registry import TaskRegistry
@@ -513,7 +514,7 @@ class EvaluationService:
         )
         doc = benchmark_document(result, {"evaluation_run_id": str(eval_id)})
         md = benchmark_markdown(doc)
-        json_bytes = json.dumps(doc, indent=2, default=str).encode()
+        json_bytes = dumps_finite(doc, indent=2).encode()
         report_id, report_uri = self.artifacts.put(
             f"reports/{eval_id}/report.json", json_bytes, "benchmark_report", "application/json"
         )
@@ -561,7 +562,7 @@ class EvaluationService:
             "reason": "leakage/lineage validation failed for an official run",
             "leakage": leakage.as_dict(),
         }
-        data = json.dumps(doc, indent=2, default=str).encode()
+        data = dumps_finite(doc, indent=2).encode()
         report_id, _ = self.artifacts.put(
             f"reports/{eval_id}/refusal.json", data, "benchmark_report", "application/json"
         )
