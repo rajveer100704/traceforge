@@ -248,7 +248,7 @@ class OpenAICompatibleProvider:
             raise failed(kind, f"{exc.message} after {attempts} attempt(s)") from exc
         except ProviderError as exc:
             raise failed("http_error", exc.message) from exc
-        except ValueError as exc:  # body is not JSON
+        except (ValueError, RecursionError) as exc:  # not JSON, or nested too deeply to parse
             raise failed("malformed_response", "provider response is not valid JSON") from exc
         try:
             gen = self._parse(data)
@@ -275,11 +275,16 @@ class OpenAICompatibleProvider:
             calls: list[GeneratedToolCall] = []
             for i, tc in enumerate(message.get("tool_calls") or []):
                 fn = tc.get("function") or {}
+                arguments = fn.get("arguments", "{}")
+                # A raw JSON string (validated later by the router) or an object; null, numbers,
+                # booleans and lists cannot become a ToolCall and are a malformed response.
+                if not isinstance(arguments, str | dict):
+                    raise TypeError("tool-call arguments must be a string or an object")
                 calls.append(
                     GeneratedToolCall(
                         call_id=str(tc.get("id") or f"call-{i}"),
                         name=str(fn.get("name", "")),
-                        arguments=fn.get("arguments", "{}"),  # raw string; validated by router
+                        arguments=arguments,
                     )
                 )
             content = str(message.get("content") or "")

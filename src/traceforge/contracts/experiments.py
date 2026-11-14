@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from enum import StrEnum
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from traceforge.contracts.common import FrozenModel, JSONValue, StrictModel, sha256_json
 from traceforge.contracts.rewards import RewardBreakdown
@@ -35,6 +35,14 @@ class ProviderConfig(FrozenModel):
     # 0.0 = explicitly free (e.g. a self-hosted endpoint). Set both or neither.
     price_per_1k_prompt: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     price_per_1k_completion: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @field_validator("price_per_1k_prompt", "price_per_1k_completion", mode="before")
+    @classmethod
+    def _no_bool_prices(cls, value: object) -> object:
+        # bool is an int subclass and would otherwise coerce to 1.0 / 0.0; ints and floats stay.
+        if isinstance(value, bool):
+            raise ValueError("prices must be numbers (USD per 1K tokens), not booleans")
+        return value
 
     @model_validator(mode="after")
     def _pricing_complete(self) -> ProviderConfig:

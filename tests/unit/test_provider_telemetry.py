@@ -826,3 +826,193 @@ def test_generation_seconds_counts_each_assistant_step_exactly_once(
     assert stats["generation_seconds"] == 4.0  # 1.5 + 2.25 + 0.25, each counted once
     assert stats["n_generation_requests"] == 3
     assert stats["generation_request_seconds"] == [0.9, 2.0, 0.25]
+
+
+# ------------------------------------------------------------------ final review fixes (PR #6)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [None, 5, 1.5, True, [1, 2]],
+    ids=["null", "int", "float", "bool", "list"],
+)
+def test_invalid_tool_call_arguments_are_malformed(arguments: Any) -> None:
+    """Null/number/bool/list arguments cannot become a ToolCall; previously they passed _parse
+    and crashed the runner with an unclassified ValidationError after the call was charged."""
+    body = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [
+                        {"id": "c1", "function": {"name": "read_file", "arguments": arguments}}
+                    ]
+                }
+            }
+        ]
+    }
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(return_value=httpx.Response(200, json=body))
+        with pytest.raises(ProviderCallFailed) as err:
+            asyncio.run(_generate(_provider(max_attempts=1)))
+    assert err.value.details["failure"] == "malformed_response"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    ['{"path": "TASK.md"}', {"path": "TASK.md"}, "not json at all"],
+    ids=["json-string", "object", "raw-string"],
+)
+def test_string_and_object_tool_call_arguments_are_accepted(arguments: Any) -> None:
+    """Strings (validated later by the router, even if not valid JSON) and objects pass."""
+    body = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [
+                        {"id": "c1", "function": {"name": "read_file", "arguments": arguments}}
+                    ]
+                }
+            }
+        ]
+    }
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(return_value=httpx.Response(200, json=body))
+        gen = asyncio.run(_generate(_provider(max_attempts=1)))
+    assert gen.tool_calls[0].arguments == arguments
+
+
+def test_missing_tool_call_arguments_default_to_empty_object() -> None:
+    body = {"choices": [{"message": {"tool_calls": [{"id": "c1", "function": {"name": "x"}}]}}]}
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(return_value=httpx.Response(200, json=body))
+        gen = asyncio.run(_generate(_provider(max_attempts=1)))
+    assert gen.tool_calls[0].arguments == "{}"
+
+
+def test_deeply_nested_json_is_malformed_not_recursion_error() -> None:
+    with respx.mock:
+        respx.post(f"{URL}/chat/completions").mock(
+            return_value=httpx.Response(
+                200, content=b"[" * 100_000, headers={"content-type": "application/json"}
+            )
+        )
+        with pytest.raises(ProviderCallFailed) as err:
+            asyncio.run(_generate(_provider(max_attempts=3)))
+    d = err.value.details
+    assert d["failure"] == "malformed_response" and d["attempts"] == 1 and d["status"] == 200
+
+
+@pytest.mark.parametrize(
+    ("prompt", "completion"),
+    [(True, 0.0), (0.0, False), (True, True)],
+    ids=["prompt-true", "completion-false", "both"],
+)
+def test_boolean_config_prices_are_rejected(prompt: Any, completion: Any) -> None:
+    with pytest.raises(ValueError, match="not booleans"):
+        ProviderConfig(
+            kind="openai_compatible",
+            base_url=URL,
+            price_per_1k_prompt=prompt,
+            price_per_1k_completion=completion,
+        )
+
+
+def test_integer_and_float_config_prices_are_preserved() -> None:
+    cfg = ProviderConfig(
+        kind="openai_compatible", base_url=URL, price_per_1k_prompt=1, price_per_1k_completion=0.25
+    )
+    assert cfg.price_per_1k_prompt == 1.0 and cfg.price_per_1k_completion == 0.25
+    assert cfg.pricing_known
+
+
+class _LegacyProvider:
+    """A provider written before the pricing_known contract: no such attribute at all."""
+
+    kind = "legacy"
+    model_id = "legacy-model"
+    model_revision = "r0"
+    trusted = True
+
+    def __init__(self) -> None:
+        self.generated = False
+        self.closed = False
+
+    async def generate(self, messages: Any, tools: Any, config: Any) -> Generation:
+        self.generated = True
+        return Generation("done", ())
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+def test_legacy_provider_without_pricing_known_is_refused_under_cost_budget(
+    registry: Any, sandbox: Any
+) -> None:
+    provider = _LegacyProvider()
+    assert not hasattr(provider, "pricing_known")
+    with pytest.raises(CapabilityUnavailable, match="cannot be enforced"):
+        _episode(registry, sandbox, provider, max_cost=1.0)  # type: ignore[arg-type]
+    assert not provider.generated and provider.closed
+
+
+def test_legacy_provider_runs_without_a_cost_budget(registry: Any, sandbox: Any) -> None:
+    """The getattr fallback only matters under an active cost budget."""
+    provider = _LegacyProvider()
+    result = _episode(registry, sandbox, provider)  # type: ignore[arg-type]
+    assert result.episode.termination_reason == "no_tool_calls" and provider.closed
+
+
+def test_real_provider_retry_under_cost_budget_stops_before_tools(
+    registry: Any, sandbox: Any
+) -> None:
+    """End to end with the real OpenAI-compatible provider: a 429 then a successful tool-call
+    response with known pricing and reported usage. The retry makes the call's cost unknown,
+    so under an active cost budget the episode stops with budget:max_cost_unverifiable before
+    the returned tool call executes. (The single-user override lets the untrusted provider use
+    the local sandbox; no tool or candidate code runs, as asserted below.)"""
+    from tenacity import wait_fixed
+
+    bundle = registry.bundle("authz-t0-s000")
+    spec = bundle.spec.model_copy(
+        update={"budget": bundle.spec.budget.model_copy(update={"max_cost_usd": 1.0})}
+    )
+    tool_call = {
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "read_file", "arguments": '{"path": "TASK.md"}'},
+    }
+    success = httpx.Response(
+        200,
+        json={
+            "choices": [{"message": {"tool_calls": [tool_call]}, "finish_reason": "tool_calls"}],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 10},
+        },
+    )
+    provider = _provider(
+        max_attempts=3,
+        retry_wait=wait_fixed(0),
+        price_per_1k_prompt=0.001,
+        price_per_1k_completion=0.002,
+    )
+    assert provider.pricing_known
+    with respx.mock:
+        route = respx.post(f"{URL}/chat/completions")
+        route.side_effect = [httpx.Response(429), success]
+        result = asyncio.run(
+            AgentRunner(sandbox, allow_untrusted_local_execution=True).run_episode(
+                spec,
+                dict(bundle.workspace_files),
+                provider,
+                run_id="t",
+                correlation_id="t",
+                generation=GenerationConfig(timeout_seconds=5),
+            )
+        )
+    assert route.call_count == 2
+    assert result.episode.termination_reason == "budget:max_cost_unverifiable"
+    (step,) = _assistant(result)
+    assert step.metadata["attempts"] == 2 and step.metadata["cost_usd"] is None
+    assert step.token_usage is not None and step.token_usage.prompt_tokens == 100
+    assert _tools(result) == []  # the returned tool call never executed
+    stats = generation_stats(result.trajectory)
+    assert stats["cost_usd"] is None and stats["provider_retries"] == 1

@@ -39,6 +39,9 @@
   - `pricing_known` is part of the `ModelProvider` interface. `Generation.usage_reported`
     defaults to inference from non-zero counts, for providers written before v0.3.
   - Episode attempt and retry totals are `None` unless every request's count is known.
+  - Tool-call `arguments` must be a string or an object (null, numbers, booleans and lists
+    are `malformed_response` instead of crashing the runner). JSON nested too deeply to parse
+    is `malformed_response`. Boolean prices are rejected by `ProviderConfig`.
 
 ### Added
 - `research/HISTORICAL_SHA256SUMS`: SHA-256 of every protected historical artifact (v0.2.0
