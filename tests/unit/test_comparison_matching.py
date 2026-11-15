@@ -158,7 +158,8 @@ def test_m6_provider_seed_must_match_for_official_comparisons() -> None:
     c.config = config(seeds=[0], **{"provider.seed": 7})
     assert "provider_seed_mismatch" in refused(b, c, tab)
     doc = go(b, c, tab, coverage_policy="intersection")
-    assert doc["seeds"]["provider_seed"] == {"baseline": None, "candidate": 7, "matched": False}
+    ps = doc["seeds"]["provider_seed"]
+    assert (ps["baseline"], ps["candidate"], ps["matched"]) == (None, 7, False)
     assert any(w["code"] == "provider_seed_mismatch" for w in doc["warnings"])
     assert "ignore" in doc["seeds"]["provider_seed_note"]
 
@@ -429,3 +430,29 @@ def test_t6_final_tier_rules_and_exploratory_banner() -> None:
                 "bootstrap_samples": 10_000,
             }
         )
+
+
+# ------------------------------------------------------------------- review regressions
+
+
+def test_seed_order_does_not_matter() -> None:
+    tab = table(3)
+    b, c = arms(tab, seeds=(0, 1))
+    c.config = config(seeds=[1, 0])
+    doc = go(b, c, tab)
+    assert doc["matching"]["status"] == "matched" and doc["matching"]["official"] is True
+
+
+def test_primary_metric_is_always_computed_for_the_evidence_tier() -> None:
+    tab = table(25)
+    b, c = arms(tab)
+    doc = go(b, c, tab, metrics=["mean_reward"])
+    assert "verified_success" in doc["groups"]["by_split"]["private_test"]["metrics"]
+    assert doc["evidence_tier"] == "directional_eligible"
+
+
+def test_seeds_block_states_which_seed_reaches_the_provider() -> None:
+    tab = table(2)
+    b, c = arms(tab)
+    sent = go(b, c, tab)["seeds"]["provider_seed"]["sent_to_provider"]
+    assert "episode seed" in sent

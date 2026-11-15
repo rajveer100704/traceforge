@@ -55,10 +55,23 @@ def _audit(doc: dict[str, Any]) -> list[str]:
         for m in g["metrics"].values():
             problems += record_problems("metric_comparison", m)
             problems += record_problems("difference", m["difference"])
+            problems += record_problems("sensitivity", m["instance_sensitivity"])
+            problems += record_problems("arm_estimate", m["baseline"])
+            problems += record_problems("arm_estimate", m["candidate"])
     for row in doc["per_scenario"]:
         problems += record_problems("per_scenario", row)
     for row in doc["per_task"]:
         problems += record_problems("per_task", row)
+    for entry in doc["latency"].values():
+        problems += record_problems("latency_entry", entry)
+    for name in ("cost_coverage", "usage_coverage"):
+        problems += record_problems("coverage_block", doc[name])
+        problems += record_problems("coverage_arm", doc[name]["baseline"])
+        problems += record_problems("coverage_arm", doc[name]["candidate"])
+    problems += record_problems("statistics", doc["statistics"])
+    problems += record_problems("report", doc["report"])
+    for row in doc.get("pairs", []):
+        problems += record_problems("pair", row)
     for p in doc["matching"]["problems"]:
         assert p["code"] in PROBLEM_CODES
     return problems
@@ -83,3 +96,20 @@ def test_documents_are_finite_and_markdown_uses_the_same_values() -> None:
     assert doc["groups"]["overall"]["metrics"]["mean_reward"]["difference"]["estimate"] is None
     md = comparison_markdown(doc)
     assert not re.search(r"\b(nan|-?inf|infinity)\b", md, re.IGNORECASE)
+
+
+def test_refusal_documents_match_their_schema() -> None:
+    import pytest
+
+    from tests.unit.comparison_fakes import StaticResolver, golden_runs, golden_table, request
+    from traceforge.modules.evaluation.comparison import ComparisonRefused, compare
+    from traceforge.modules.evaluation.comparison_reports import refusal_document
+
+    b, c = golden_runs()
+    c.records = c.records[:-1]
+    with pytest.raises(ComparisonRefused) as exc:
+        compare(b, c, request(), StaticResolver(golden_table()))
+    doc = refusal_document(exc.value.document)
+    assert record_problems("refusal_document", doc) == []
+    assert record_problems("run", doc["baseline"]) == []
+    assert record_problems("matching", doc["matching"]) == []

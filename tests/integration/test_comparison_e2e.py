@@ -152,3 +152,53 @@ def test_x3_frozen_v02_bundle_is_compared_read_only_and_stays_unchanged(platform
         check=False,
     )
     assert check.returncode == 0, check.stdout + check.stderr
+
+
+def test_malformed_or_mismatched_bundles_are_refused_not_crashing(
+    platform: Any, tmp_path: Path
+) -> None:
+    import shutil
+
+    def bundle_ref(path: Path, name: str = "exp-G-pipeline_check") -> dict[str, Any]:
+        return {
+            "source": "bundle",
+            "evaluation_id": G_EVAL,
+            "bundle_dir": str(path),
+            "config_name": name,
+        }
+
+    def codes(ref: dict[str, Any]) -> set[str]:
+        req = ComparisonRequest.model_validate({"baseline": ref, "candidate": ref})
+        with pytest.raises(ComparisonRefusedError) as exc:
+            platform.comparisons.compare(req)
+        assert Path(exc.value.paths["refusal_json"]).is_file()
+        assert exc.value.document["baseline"] is None
+        return {p["code"] for p in exc.value.document["matching"]["problems"]}
+
+    assert codes(bundle_ref(tmp_path / "missing")) == {"invalid_bundle"}
+    assert codes(bundle_ref(G_BUNDLE, "experiment_G")) == {
+        "invalid_bundle"
+    }  # not a benchmark config
+    copy = tmp_path / "bundle"
+    shutil.copytree(G_BUNDLE, copy)
+    meta = json.loads((copy / "bundle.json").read_text(encoding="utf-8"))
+    meta["configs"]["exp-G-pipeline_check"]["config"]["provider"]["policy"] = "noop"
+    (copy / "bundle.json").write_text(json.dumps(meta), encoding="utf-8")
+    assert codes(bundle_ref(copy)) == {"invalid_bundle"}  # config did not produce these records
+
+    from traceforge.cli import app
+
+    out = CliRunner().invoke(
+        app,
+        [
+            "benchmark",
+            "compare",
+            "--baseline",
+            G_EVAL,
+            "--candidate",
+            G_EVAL,
+            "--baseline-config",
+            "exp-G-pipeline_check",
+        ],
+    )
+    assert out.exit_code == 1 and "need the matching" in out.output

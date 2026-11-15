@@ -362,6 +362,8 @@ def benchmark_compare(
     from traceforge.contracts.comparison import DEFAULT_VARIED_FACTORS, ComparisonRequest
 
     def ref(run_id: str, bundle: Path | None, name: str | None) -> dict[str, object]:
+        if bundle is None and name is not None:
+            _fail("--baseline-config/--candidate-config need the matching --*-bundle option")
         if bundle is None:
             return {"source": "evaluation", "evaluation_id": run_id}
         return {

@@ -322,7 +322,9 @@ RECORD_SCHEMAS: dict[str, dict[str, str]] = {
     },
     "seeds": {
         "episode_seeds": "Benchmark episode seeds (pair-key component).",
-        "provider_seed": "{baseline, candidate, matched}: BenchmarkConfig.provider.seed.",
+        "provider_seed": "{baseline, candidate, matched, sent_to_provider}: configured "
+        "BenchmarkConfig.provider.seed (must match for official comparisons) and which seed the "
+        "runner actually sends to the provider.",
         "bootstrap_seed": "Statistical resampling seed (independent of both runs).",
         "provider_seed_note": "Providers may ignore requested seeds.",
     },
@@ -388,10 +390,11 @@ RECORD_SCHEMAS: dict[str, dict[str, str]] = {
         "direction": "higher | lower | neutral (which way is favourable).",
         "category": "outcome | safety | reward | reliability | efficiency | cost.",
         "population": "Pairs the metric is computed over.",
-        "baseline": "{estimate, numerator, denominator, n}.",
-        "candidate": "{estimate, numerator, denominator, n}.",
+        "baseline": "Baseline arm estimate (record arm_estimate).",
+        "candidate": "Candidate arm estimate (record arm_estimate).",
         "difference": "Primary scenario-clustered difference (record difference).",
-        "instance_sensitivity": "Secondary task-instance-clustered interval; never interpreted.",
+        "instance_sensitivity": "Secondary task-instance-clustered interval (record "
+        "sensitivity); never interpreted.",
         "relative_difference": "difference / baseline (non-negative metrics, baseline > 0).",
         "coverage": "{pairs_used, pairs_total}.",
         "scenario_tier": "From this metric's n_clusters.",
@@ -412,6 +415,86 @@ RECORD_SCHEMAS: dict[str, dict[str, str]] = {
         "n_observations": "Pairs used (mean metrics) or null (ratio metrics).",
         "undefined_replicates": "Ratio replicates with a zero denominator (0 for mean metrics).",
         "note": "Why the interval is undefined, else null.",
+    },
+    "sensitivity": {
+        "estimate": "Same estimate as the primary difference.",
+        "ci_low": "Instance-clustered interval low.",
+        "ci_high": "Instance-clustered interval high.",
+        "confidence": "Confidence level.",
+        "samples": "Bootstrap resamples.",
+        "seed": "Bootstrap seed.",
+        "method": "Bootstrap method.",
+        "cluster_unit": "task_instance.",
+        "n_clusters": "Task instances with data.",
+        "n_observations": "Pairs used (mean metrics) or null.",
+        "undefined_replicates": "Ratio replicates with a zero denominator.",
+        "note": "Why the interval is undefined, else null.",
+        "width_ratio": "Instance-clustered width / scenario-clustered width.",
+        "label": "Why this interval is never interpreted.",
+    },
+    "arm_estimate": {
+        "estimate": "numerator / denominator, or null with an empty denominator.",
+        "numerator": "Sum of per-episode numerators over used pairs.",
+        "denominator": "Pairs used (mean metrics) or summed denominators (ratio metrics).",
+        "n": "Denominator as an integer.",
+    },
+    "latency_entry": {
+        "baseline": "{n, p50, p90, p95, max} (PR 1B percentiles).",
+        "candidate": "{n, p50, p90, p95, max}.",
+        "difference": "{p50, p90, p95}: candidate minus baseline; descriptive, no interval.",
+    },
+    "coverage_block": {
+        "baseline": "Record coverage_arm.",
+        "candidate": "Record coverage_arm.",
+        "comparable": "True only when both arms are complete.",
+        "reason": "Why not comparable, else null.",
+    },
+    "coverage_arm": {
+        "status": "complete | partial | unknown | overflow | no_episodes.",
+        "covered": "Episodes with known cost / complete usage.",
+        "n": "Episodes.",
+        "total": "Total (null unless complete).",
+        "lower_bound": "Cost lower bound (partial coverage only; never differenced).",
+    },
+    "statistics": {
+        "primary_cluster_unit": "structural_scenario.",
+        "secondary_cluster_unit": "task_instance.",
+        "estimands": "Mean, ratio and paired-conditional estimands.",
+        "method": "Bootstrap methods.",
+        "samples": "Bootstrap resamples.",
+        "bootstrap_seed": "Bootstrap seed.",
+        "confidence": "Confidence level.",
+        "thresholds": "{insufficient_below, exploratory_below}.",
+        "eligibility_note": "What the 20-scenario gate does and does not mean.",
+    },
+    "report": {
+        "tier": "development | final.",
+        "bootstrap_samples": "Resamples used.",
+        "final_min_bootstrap_samples": "10,000.",
+        "final_min_primary_scenarios": "10.",
+        "note": "Final-tier requirements.",
+    },
+    "pair": {
+        "key": "[task_id, task_version, episode_seed].",
+        "scenario_id": "Structural scenario.",
+        "family": "Task family.",
+        "template": "Template.",
+        "split": "Split.",
+        "difficulty": "Difficulty.",
+        "baseline_rollout_id": "Baseline rollout.",
+        "candidate_rollout_id": "Candidate rollout.",
+        "values": "Mean-metric values {baseline, candidate}.",
+    },
+    "refusal_document": {
+        "report_type": "Always 'benchmark_comparison_refusal'.",
+        "comparison_schema_version": "Comparison contract version.",
+        "generated_at": "UTC timestamp.",
+        "traceforge_version": "TraceForge version.",
+        "request": "The comparison request.",
+        "baseline": "Baseline run (record run) or null when it could not be loaded.",
+        "candidate": "Candidate run (record run) or null when it could not be loaded.",
+        "matching": "Matching block with status 'refused' and its problems.",
+        "non_finite_fields": "Optional.",
     },
     "per_scenario": {
         "scenario_id": "Structural scenario.",
@@ -441,7 +524,10 @@ RECORD_SCHEMAS: dict[str, dict[str, str]] = {
         "change": "improved | regressed | unchanged | mixed (descriptive).",
     },
 }
-OPTIONAL_FIELDS = {"comparison_document": frozenset({"pairs", "non_finite_fields"})}
+OPTIONAL_FIELDS = {
+    "comparison_document": frozenset({"pairs", "non_finite_fields"}),
+    "refusal_document": frozenset({"non_finite_fields"}),
+}
 
 
 def scenario_tier(n_scenarios: int) -> str:

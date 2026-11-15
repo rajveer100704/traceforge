@@ -72,6 +72,39 @@ def _summaries(raw: list[Any], where: str) -> list[RolloutSummary]:
     return out
 
 
+def _check_bundle_consistency(cfg: BenchmarkConfig, records: list[RolloutSummary]) -> None:
+    """A bundle's config map is not linked to its evaluation ids: verify that the selected
+    config actually produced these records (provider, policy, verifier, reward, splits, seeds)."""
+    if not records:
+        raise _LoadRefusal("invalid_bundle", "no episodes of this evaluation in the bundle")
+    seeds = set(cfg.effective_seeds)
+    splits = {s.value for s in cfg.splits}
+    reward = f"{cfg.reward_policy}@"
+    for r in records:
+        md = r.metadata
+        mismatches = []
+        if r.provider_kind != cfg.provider.kind:
+            mismatches.append(f"provider_kind {r.provider_kind} != {cfg.provider.kind}")
+        if cfg.provider.kind != "demo" and r.model_id != cfg.provider.model_id:
+            mismatches.append(f"model_id {r.model_id} != {cfg.provider.model_id}")
+        if cfg.provider.kind == "demo" and md.get("policy") not in (None, cfg.provider.policy):
+            mismatches.append(f"policy {md.get('policy')} != {cfg.provider.policy}")
+        if md.get("verifier_profile") not in (None, cfg.verifier_profile):
+            mismatches.append(f"verifier_profile {md.get('verifier_profile')}")
+        rp = md.get("reward_policy")
+        if rp is not None and str(rp) != cfg.reward_policy and not str(rp).startswith(reward):
+            mismatches.append(f"reward_policy {rp} != {cfg.reward_policy}")
+        if md.get("split") is not None and str(md.get("split")) not in splits:
+            mismatches.append(f"split {md.get('split')} not in {sorted(splits)}")
+        if md.get("seed") not in seeds:
+            mismatches.append(f"seed {md.get('seed')} not in {sorted(seeds)}")
+        if mismatches:
+            raise _LoadRefusal(
+                "invalid_bundle",
+                f"config {cfg.name!r} did not produce record {r.task_id}: {'; '.join(mismatches)}",
+            )
+
+
 class ComparisonService:
     def __init__(
         self,
@@ -123,43 +156,61 @@ class ComparisonService:
         )
 
     def _load_bundle(self, ref: RunRef) -> RunData:
+        try:
+            return self._read_bundle(ref)
+        except _LoadRefusal:
+            raise
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            # missing/malformed bundle files are refusals, never tracebacks
+            raise _LoadRefusal(
+                "invalid_bundle", f"{ref.bundle_dir}: {type(exc).__name__}: {exc}"
+            ) from exc
+
+    def _read_bundle(self, ref: RunRef) -> RunData:
         bundle = Path(str(ref.bundle_dir))
+        if not (bundle / "bundle.json").is_file():
+            raise _LoadRefusal("invalid_bundle", f"{bundle}: no bundle.json")
         problems = verify_bundle(bundle)
         if problems:
             raise _LoadRefusal("invalid_bundle", f"{bundle}: {problems}")
         meta = json.loads((bundle / "bundle.json").read_text(encoding="utf-8"))
+        if "episodes.jsonl.gz" not in (meta.get("files_sha256") or {}):
+            raise _LoadRefusal("invalid_bundle", "episodes file is not covered by bundle hashes")
         if str(ref.evaluation_id) not in {str(x) for x in meta.get("evaluation_ids") or []}:
             raise _LoadRefusal("invalid_bundle", f"evaluation {ref.evaluation_id} not in bundle")
         entry = (meta.get("configs") or {}).get(str(ref.config_name))
         if not isinstance(entry, dict) or "config" not in entry:
             raise _LoadRefusal("invalid_bundle", f"config {ref.config_name!r} not in bundle")
         try:
-            config = _normalised_config(entry["config"])
+            cfg = BenchmarkConfig.model_validate(entry["config"])
         except ValidationError as exc:
             raise _LoadRefusal(
                 "invalid_bundle", f"config is not a benchmark config: {exc}"
             ) from exc
-        episodes = bundle / "episodes.jsonl.gz"
-        if not episodes.is_file():
-            raise _LoadRefusal("invalid_bundle", "bundle has no episodes file")
+        config = cfg.model_dump(mode="json")
         correlation = f"bench:{ref.evaluation_id}"
         raw = []
-        with gzip.open(episodes, "rt", encoding="utf-8") as fh:
+        with gzip.open(bundle / "episodes.jsonl.gz", "rt", encoding="utf-8") as fh:
             for line in fh:
                 if not line.strip():
                     continue
-                summary = json.loads(line).get("summary") or {}
+                item = json.loads(line)
+                summary = item.get("summary") if isinstance(item, dict) else None
+                if not isinstance(summary, dict):
+                    continue
                 if (summary.get("metadata") or {}).get("correlation_id") == correlation:
                     raw.append(summary)
+        records = _summaries(raw, f"bundle {bundle}")
+        _check_bundle_consistency(cfg, records)
         return RunData(
             ref=ref,
             config=config,
-            records=_summaries(raw, f"bundle {bundle}"),
+            records=records,
             status="completed",
             run_mode=str(config.get("run_mode") or "official"),
             leakage_ok=None,  # bundles record no per-run leakage verdict: always diagnostic
-            name=str(config.get("name") or ref.config_name),
-            config_hash=str(entry.get("config_hash") or ""),
+            name=cfg.name,
+            config_hash=cfg.config_hash,  # same hash as the database path
         )
 
     # ------------------------------------------------------------------ comparing
@@ -176,10 +227,18 @@ class ComparisonService:
         except _LoadRefusal as exc:
             refusal = {
                 "request": request.model_dump(mode="json"),
+                "baseline": None,
+                "candidate": None,
                 "matching": {
                     "status": "refused",
                     "official": False,
                     "coverage_policy": request.coverage_policy,
+                    "excluded": [],
+                    "config_differences": [],
+                    "n_pairs": 0,
+                    "n_task_instances": 0,
+                    "n_structural_scenarios": 0,
+                    "n_families": 0,
                     "problems": [
                         {
                             "code": exc.code,

@@ -194,9 +194,9 @@ def _resolve(
 
 
 def _effective_seeds(cfg: dict[str, Any]) -> list[int]:
-    seeds = list(cfg.get("seeds") or [])
+    seeds = sorted(set(cfg.get("seeds") or []))
     if seeds:
-        return seeds
+        return seeds  # order does not change pairing: compared as a set
     ps = (cfg.get("provider") or {}).get("seed")
     return [ps if ps is not None else 0]
 
@@ -708,7 +708,8 @@ def compare(
         unknown = set(request.metrics) - set(cc.METRIC_SPECS)
         if unknown:
             raise ValueError(f"unknown comparison metrics: {sorted(unknown)}")
-        specs = [s for s in specs if s.key in request.metrics]
+        # the primary metric is always computed: the evidence tier depends on it
+        specs = [s for s in specs if s.key in request.metrics or s.key == cc.PRIMARY_METRIC]
     strict = request.coverage_policy == "strict"
     problems = _Problems()
     _run_checks(baseline, "baseline", problems)
@@ -975,6 +976,8 @@ def compare(
                 "baseline": (baseline.config.get("provider") or {}).get("seed"),
                 "candidate": (candidate.config.get("provider") or {}).get("seed"),
                 "matched": seeds_matched,
+                "sent_to_provider": "episode seed (BenchmarkRunner sends each episode's seed; "
+                "provider.seed is the configured value and is used only when seeds is empty)",
             },
             "bootstrap_seed": request.bootstrap_seed,
             "provider_seed_note": cc.PROVIDER_SEED_NOTE,
