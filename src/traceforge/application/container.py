@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from traceforge.application.comparison import ComparisonService
 from traceforge.application.jobs import JobContext, JobService
 from traceforge.application.rollouts import RolloutExecutor
 from traceforge.application.services import (
@@ -97,6 +98,7 @@ class Platform:
     verifications: VerificationService
     experiments: ExperimentService
     evaluations: EvaluationService
+    comparisons: ComparisonService
     jobs: JobService
 
     @classmethod
@@ -155,6 +157,7 @@ class Platform:
                 db, artifacts, BenchmarkRunner(executor, registry), rollouts, settings.reports_dir
             ),
             jobs=jobs,
+            comparisons=ComparisonService(db, artifacts, registry, settings.reports_dir),
         )
         platform.evaluations.platform = platform  # lineage resolution needs DB + store
         if isinstance(queue, InlineQueue):

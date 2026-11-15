@@ -149,3 +149,70 @@ def cluster_bootstrap(
     hi_idx = min(samples - 1, int((1 - (1 - confidence) / 2) * samples) - 1)
     base["ci_low"], base["ci_high"] = stats[lo_idx], stats[hi_idx]
     return base
+
+
+PAIRED_RATIO_METHOD = "paired cluster percentile bootstrap (difference of pooled ratios)"
+
+
+def paired_cluster_ratio_bootstrap(
+    clusters: list[tuple[float, float, float, float]],
+    *,
+    samples: int = 2000,
+    confidence: float = 0.95,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Paired cluster bootstrap for a difference of pooled ratios.
+
+    Each cluster is ``(num_candidate, den_candidate, num_baseline, den_baseline)``, the sums
+    over one cluster (one structural scenario). The estimate is
+    ``sum(num_c)/sum(den_c) - sum(num_b)/sum(den_b)``. Every resample draws one set of clusters
+    and uses it for both arms, so the pairing is preserved. A replicate is undefined when either
+    resampled denominator is 0; undefined replicates are never dropped: if any occurs the
+    interval is None and ``undefined_replicates`` reports how many. Clusters with no
+    denominator in either arm carry no information and are excluded. Deterministic for a fixed
+    seed (same draw sequence as ``cluster_bootstrap``).
+    """
+    clusters = [c for c in clusters if c[1] or c[3]]
+    nc, dc = sum(c[0] for c in clusters), sum(c[1] for c in clusters)
+    nb, db = sum(c[2] for c in clusters), sum(c[3] for c in clusters)
+    base: dict[str, Any] = {
+        "estimate": (nc / dc - nb / db) if dc and db else None,
+        "ci_low": None,
+        "ci_high": None,
+        "n_clusters": len(clusters),
+        "n_observations": None,
+        "confidence": confidence,
+        "samples": samples,
+        "method": PAIRED_RATIO_METHOD,
+        "undefined_replicates": 0,
+    }
+    if len(clusters) < 2:
+        base["note"] = "fewer than 2 independent clusters: interval undefined"
+        return base
+    rng = random.Random(seed)  # noqa: S311 - statistical resampling, not security
+    k = len(clusters)
+    stats: list[float] = []
+    undefined = 0
+    for _ in range(samples):
+        a = b = c_ = d = 0.0
+        for _j in range(k):
+            x = clusters[rng.randrange(k)]
+            a += x[0]
+            b += x[1]
+            c_ += x[2]
+            d += x[3]
+        if b == 0 or d == 0:
+            undefined += 1
+            continue
+        stats.append(a / b - c_ / d)
+    base["undefined_replicates"] = undefined
+    if undefined:
+        base["note"] = (
+            f"{undefined} of {samples} replicates had a zero denominator: interval undefined"
+        )
+        return base
+    stats.sort()
+    lo_idx = int(((1 - confidence) / 2) * samples)
+    hi_idx = min(samples - 1, int((1 - (1 - confidence) / 2) * samples) - 1)
+    base["ci_low"], base["ci_high"] = stats[lo_idx], stats[hi_idx]
+    return base

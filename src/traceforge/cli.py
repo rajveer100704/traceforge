@@ -340,6 +340,81 @@ def benchmark_run(config: Path = typer.Option(None, help="Benchmark YAML")) -> N
     )
 
 
+@benchmark_app.command("compare")
+def benchmark_compare(
+    baseline: str = typer.Option(..., help="Baseline evaluation run id"),
+    candidate: str = typer.Option(..., help="Candidate evaluation run id"),
+    baseline_bundle: Path = typer.Option(None, help="Read the baseline from this bundle dir"),
+    baseline_config: str = typer.Option(None, help="Baseline config name inside the bundle"),
+    candidate_bundle: Path = typer.Option(None, help="Read the candidate from this bundle dir"),
+    candidate_config: str = typer.Option(None, help="Candidate config name inside the bundle"),
+    coverage_policy: str = typer.Option("strict", help="strict | intersection (diagnostic)"),
+    allow_differ: list[str] = typer.Option(
+        [], help="Extra BenchmarkConfig path allowed to differ (repeatable)"
+    ),
+    bootstrap_samples: int = typer.Option(2000, help="Bootstrap resamples (final: >= 10000)"),
+    bootstrap_seed: int = typer.Option(0, help="Statistical resampling seed"),
+    report_tier: str = typer.Option("development", help="development | final"),
+    include_pairs: bool = typer.Option(False, help="Include every episode pair in the JSON"),
+) -> None:
+    """Paired comparison of two benchmark runs (JSON + Markdown reports)."""
+    from traceforge.application.comparison import ComparisonRefusedError
+    from traceforge.contracts.comparison import DEFAULT_VARIED_FACTORS, ComparisonRequest
+
+    def ref(run_id: str, bundle: Path | None, name: str | None) -> dict[str, object]:
+        if bundle is None and name is not None:
+            _fail("--baseline-config/--candidate-config need the matching --*-bundle option")
+        if bundle is None:
+            return {"source": "evaluation", "evaluation_id": run_id}
+        return {
+            "source": "bundle",
+            "evaluation_id": run_id,
+            "bundle_dir": str(bundle),
+            "config_name": name,
+        }
+
+    from pydantic import ValidationError
+
+    try:
+        request = ComparisonRequest.model_validate(
+            {
+                "baseline": ref(baseline, baseline_bundle, baseline_config),
+                "candidate": ref(candidate, candidate_bundle, candidate_config),
+                "coverage_policy": coverage_policy,
+                "varied_factors": [*DEFAULT_VARIED_FACTORS, *allow_differ],
+                "bootstrap_samples": bootstrap_samples,
+                "bootstrap_seed": bootstrap_seed,
+                "report_tier": report_tier,
+                "include_pairs": include_pairs,
+            }
+        )
+    except ValidationError as exc:
+        _fail(f"invalid comparison request: {exc}")
+    p = _platform()
+    try:
+        doc, paths = p.comparisons.compare(request)
+    except ComparisonRefusedError as exc:
+        _out({"status": "refused", "problems": exc.document["matching"]["problems"], **exc.paths})
+        raise typer.Exit(1) from exc
+    primary = doc["groups"]["by_split"].get("private_test", {}).get("metrics", {})
+    vs = primary.get("verified_success", {}).get("difference")
+    _out(
+        {
+            "comparison_id": doc["comparison_id"],
+            "status": doc["matching"]["status"],
+            "evidence_tier": doc["evidence_tier"],
+            "evidence_source": doc["evidence_source"],
+            "report_tier": doc["report_tier"],
+            "n_pairs": doc["matching"]["n_pairs"],
+            "n_task_instances": doc["matching"]["n_task_instances"],
+            "n_structural_scenarios": doc["matching"]["n_structural_scenarios"],
+            "primary_endpoint": doc["primary_endpoint"],
+            "primary_verified_success_difference": vs,
+            **paths,
+        }
+    )
+
+
 @app.command()
 def report(run_id: str) -> None:
     """Print the Markdown report for an evaluation run id."""
