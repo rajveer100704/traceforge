@@ -726,6 +726,16 @@ class ExperimentRepository:
             raise NotFoundError(f"evaluation {evaluation_id} not found")
         return row
 
+    def list_task_runs(self, evaluation_id: uuid.UUID) -> list[m.TaskRun]:
+        """Every episode (task run) recorded for one evaluation run; read-only."""
+        return list(
+            self.s.scalars(
+                select(m.TaskRun)
+                .where(m.TaskRun.evaluation_run_id == evaluation_id)
+                .order_by(m.TaskRun.id)
+            )
+        )
+
     def create_training_run(
         self,
         *,

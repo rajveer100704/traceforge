@@ -137,3 +137,39 @@ re-imported under a different id is not detected (no content-level matching yet)
   task-clustered) at thresholds 0.1/0.25/0.5/0.75/0.9 (`reward_thresholds`).
 - **Evidence labelling**: `metrics.evidence.kind` is `scripted_agent_pipeline_validation` for the
   demo provider and `model_evaluation` otherwise; scripted results are never learned-model evidence.
+
+## v0.3 — paired benchmark comparison
+
+`traceforge benchmark compare --baseline <id> --candidate <id>` compares two benchmark runs
+episode by episode. The full contract (fields, estimands, problem codes, legacy scenario
+registry) is generated in **`docs/comparison-contract.md`**.
+
+- **Pairing:** episodes pair on `(task_id, task_version, episode_seed)`. Strict coverage
+  (default) refuses any difference in keys; `--coverage-policy intersection` is diagnostic only
+  and lists every exclusion. Duplicates, task-version, verifier, scenario-identity and
+  never-variable configuration differences are refused in every mode.
+- **Independent unit:** the **structural scenario**: templates with one authoritative oracle
+  identity (normalised hidden tests, visible tests and verifier configuration). Seeds repeat a
+  task and seeded task instances vary only names and values, so neither becomes an independent
+  bootstrap cluster. Legacy task versions 1.0.0/1.1.0 resolve through an explicit registry with
+  pinned oracle fingerprints; SSRF t0 and t1 share one scenario because their oracle tests are
+  identical. Record metadata never changes cluster membership.
+- **Estimands:** mean metrics use `sum of paired differences / usable pairs`, ratio metrics the
+  difference of pooled ratios: both equal the difference of the arms' PR 1B estimands.
+  Intervals are single-stage percentile bootstraps over scenarios (ratio metrics share one draw
+  for both arms; any zero-denominator replicate makes the interval null). A task-instance
+  interval is shown as sensitivity only.
+- **Primary endpoint:** `private_test` / `verified_success`. Without private_test pairs it is
+  unavailable and pooled results are not substituted. Legacy public_test scenarios also appear in
+  train, so public results measure in-distribution performance.
+- **Evidence tiers:** fewer than 10 primary scenarios: `insufficient_scenarios`; 10–19:
+  `exploratory_only`; 20 or more: `directional_eligible`, an eligibility gate, not proof of power
+  or generalisation. A directional `improvement`/`regression` also needs an official, strictly
+  matched comparison (both arms `v3_full`, completed, official, matching `provider.seed`) and a
+  primary interval excluding 0. `report_tier`, `evidence_tier` and `evidence_source` are
+  separate; a final report needs ≥ 10,000 resamples and ≥ 10 primary scenarios.
+- **Cost and tokens:** differences only with complete coverage in both arms; lower bounds are
+  never differenced.
+- The legacy benchmark has 3 private structural scenarios (9 instances): comparisons on it are
+  `insufficient_scenarios`. Scripted-provider comparisons are pipeline validation, not
+  learned-model evidence.

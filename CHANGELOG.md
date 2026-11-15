@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Added (v0.3 PR 2: paired benchmark comparison)
+- `traceforge benchmark compare` and `ComparisonService`: paired comparison of two benchmark runs
+  loaded from the database or, read-only, from reproducibility bundles. Reports are written as
+  artifacts (`comparisons/{id}/comparison.json|md`); no database migration, no API endpoint.
+- Matching on `(task_id, task_version, episode_seed)` with strict (official) and intersection
+  (diagnostic) coverage; refusals are persisted as `comparison_refusal.json`.
+- Structural scenarios (`modules/evaluation/scenarios.py`) resolved from authoritative sources:
+  a version-scoped legacy registry with pinned oracle fingerprints
+  (`modules/tasks/oracle_identity.py`); SSRF t0/t1 share one scenario (identical oracles).
+  Non-legacy task versions are refused until a benchmark catalogue resolver exists.
+- Paired estimators (Class A metrics equal the difference of PR 1B estimands), a
+  structural-scenario cluster bootstrap, a new `paired_cluster_ratio_bootstrap` (null interval
+  with a count when a replicate has a zero denominator), Class B conditional diagnostics and
+  Class C descriptive latency.
+- `report_tier`, `evidence_tier` (thresholds 10 and 20 structural scenarios) and
+  `evidence_source`; private_test primary endpoint; provider-seed matching; generated
+  `docs/comparison-contract.md`.
+- PR 1B metrics, the metric contract, golden statistics and v0.2 artifacts are unchanged.
+
 ### Added (v0.3 PR 1B: metric contract and reporting)
 - Versioned metric contract (`modules/evaluation/metric_contract.py`, schema 2) with a
   generated `docs/metrics-contract.md`. Every emitted metric has a registered numerator,
