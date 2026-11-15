@@ -5,7 +5,6 @@ Every step asserts a real, computed property; failures are collected and reporte
 
 from __future__ import annotations
 
-import json
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,6 +16,7 @@ from traceforge.contracts.tasks import Split
 from traceforge.contracts.verification import Verdict
 from traceforge.modules.evaluation.contamination import check_task_splits
 from traceforge.modules.evaluation.experiments import pick_tasks
+from traceforge.modules.evaluation.serialization import dumps_finite
 from traceforge.modules.tasks.registry import validate_registry
 
 if TYPE_CHECKING:
@@ -205,8 +205,6 @@ async def run_demo(p: Platform, profile: str = "local") -> dict[str, Any]:
     }
     out_dir = p.settings.reports_dir / f"demo-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "demo_summary.json").write_text(
-        json.dumps(summary, indent=2, default=str), encoding="utf-8"
-    )
+    (out_dir / "demo_summary.json").write_text(dumps_finite(summary, indent=2), encoding="utf-8")
     summary["summary_path"] = str(out_dir / "demo_summary.json")
     return summary

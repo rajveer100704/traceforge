@@ -116,6 +116,10 @@ PROVIDER_V03_DEFAULTS: dict[str, object] = {
     "price_per_1k_prompt": None,
     "price_per_1k_completion": None,
 }
+# Benchmark fields added in v0.3; hashed only when changed from the default.
+BENCHMARK_V03_DEFAULTS: dict[str, object] = {"report_tier": "development"}
+# Minimum bootstrap resamples for a "final" report (development keeps the 2,000 default).
+FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES = 10_000
 
 
 class BenchmarkConfig(FrozenModel):
@@ -139,6 +143,23 @@ class BenchmarkConfig(FrozenModel):
     run_mode: str = Field(default="official", pattern="^(official|diagnostic)$")
     training_lineage: TrainingLineage = TrainingLineage()
     reward_thresholds: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 0.9)
+    # v0.3 -------------------------------------------------------------------------------------
+    # "development" (default): intervals use bootstrap_samples as configured (2,000 by default)
+    # and reports are labelled development-grade. "final": requires official run mode and at
+    # least FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES resamples. Opt-in, so existing hashes are stable.
+    report_tier: str = Field(default="development", pattern="^(development|final)$")
+
+    @model_validator(mode="after")
+    def _final_tier_requirements(self) -> BenchmarkConfig:
+        if self.report_tier == "final":
+            if self.run_mode != "official":
+                raise ValueError("report_tier 'final' requires run_mode 'official'")
+            if self.bootstrap_samples < FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES:
+                raise ValueError(
+                    f"report_tier 'final' requires bootstrap_samples >= "
+                    f"{FINAL_REPORT_MIN_BOOTSTRAP_SAMPLES} (got {self.bootstrap_samples})"
+                )
+        return self
 
     @property
     def effective_seeds(self) -> tuple[int, ...]:
@@ -152,7 +173,7 @@ class BenchmarkConfig(FrozenModel):
     def config_hash(self) -> str:
         # v0.2 fields are hashed only when changed from their defaults, so v0.1 hashes are stable.
         data = self.model_dump(mode="json")
-        for key, default in BENCHMARK_V02_DEFAULTS.items():
+        for key, default in {**BENCHMARK_V02_DEFAULTS, **BENCHMARK_V03_DEFAULTS}.items():
             if data.get(key) == default:
                 data.pop(key, None)
         provider = data["provider"]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+import statistics
 from statistics import NormalDist
 from typing import Any
 
@@ -41,11 +42,13 @@ def bootstrap_mean_interval(
 
 
 def proportion(successes: int, n: int, confidence: float = 0.95) -> dict[str, Any]:
+    """Wilson proportion. An empty denominator has no rate: ``rate`` is None (never 0.0), and
+    the interval is (0, 1), meaning no information. Non-empty results are unchanged from v0.2."""
     lo, hi = wilson_interval(successes, n, confidence)
     return {
         "successes": successes,
         "n": n,
-        "rate": (successes / n) if n else 0.0,
+        "rate": (successes / n) if n else None,
         "ci_low": lo,
         "ci_high": hi,
         "confidence": confidence,
@@ -53,7 +56,49 @@ def proportion(successes: int, n: int, confidence: float = 0.95) -> dict[str, An
     }
 
 
+def format_rate(rate: float | None, spec: str = ".1%") -> str:
+    """Format a proportion's rate for reports; an undefined rate (empty denominator) is 'n/a'."""
+    return "n/a" if rate is None else format(rate, spec)
+
+
+PERCENTILE_METHOD = (
+    "n=0: all null; n=1: every percentile equals the single value; n>=2: "
+    "statistics.quantiles(n=100, method='inclusive') (linear interpolation, clamped to the "
+    "sample range); max = maximum"
+)
+
+
+def percentiles(values: list[float]) -> dict[str, Any]:
+    """p50/p90/p95/max of a sample, with its size. Defined for every n (see PERCENTILE_METHOD)."""
+    vals = sorted(
+        float(v)
+        for v in values
+        if isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
+    )
+    out: dict[str, Any] = {"n": len(vals), "method": PERCENTILE_METHOD}
+    if not vals:
+        return {**out, "p50": None, "p90": None, "p95": None, "max": None}
+    if len(vals) == 1:
+        v = vals[0]
+        return {**out, "p50": v, "p90": v, "p95": v, "max": v}
+    cuts = statistics.quantiles(vals, n=100, method="inclusive")  # cuts[k-1] = k-th percentile
+    # Linear interpolation can overshoot by one float ulp (e.g. two equal values give a p95 just
+    # above the max). Clamp to the sample range and keep p50 <= p90 <= p95 <= max exactly.
+    lo, hi = vals[0], vals[-1]
+    p50 = min(max(cuts[49], lo), hi)
+    p90 = min(max(cuts[89], p50), hi)
+    p95 = min(max(cuts[94], p90), hi)
+    return {**out, "p50": p50, "p90": p90, "p95": p95, "max": hi}
+
+
 CLUSTER_METHOD = "task-cluster percentile bootstrap (pooled ratio)"
+# Documented (not changed) in v0.3: the estimand is the pooled episode-level ratio, so a task
+# contributes in proportion to its number of episodes. With equal episodes per task (the benchmark
+# runner's design) this equals the mean of per-task rates; with unequal counts it does not.
+CLUSTER_ESTIMAND = (
+    "pooled ratio sum(values)/count over all episodes; tasks are weighted by their episode "
+    "count (equal weights when every task has the same number of episodes)"
+)
 
 
 def cluster_bootstrap(
